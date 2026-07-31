@@ -145,7 +145,7 @@ fun MediaTile(
                 }
             }
 
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = overlayVisible,
                 enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
                 exit = fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.9f)
