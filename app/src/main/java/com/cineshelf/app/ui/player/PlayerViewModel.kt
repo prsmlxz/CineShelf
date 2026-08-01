@@ -14,6 +14,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun getInitialPosition(file: File): Long = repository.getInitialPosition(file)
 
+    fun findSubtitleFiles(file: File): List<File> = repository.findSubtitleFiles(file)
+
     fun saveProgress(file: File, positionMs: Long, durationMs: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveProgress(file, positionMs, durationMs)

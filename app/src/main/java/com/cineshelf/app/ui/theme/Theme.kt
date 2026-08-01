@@ -19,7 +19,7 @@ private val CineShelfDarkColors = darkColorScheme(
     surfaceVariant = SurfaceCardElevated,
     onSurfaceVariant = TextSecondary,
     error = AccentDanger,
-    outline = SurfaceStroke
+    outline = HairlineMid
 )
 
 @Composable

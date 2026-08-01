@@ -158,6 +158,7 @@ class LibraryRepository(private val context: Context) {
             watched = metadata.isWatched(file.absolutePath),
             positionMs = metadata.getPosition(file.absolutePath),
             durationMs = metadata.getDuration(file.absolutePath),
+            lastPlayedAt = metadata.getLastPlayedAt(file.absolutePath),
             thumbnailPath = thumb
         )
     }
@@ -171,6 +172,31 @@ class LibraryRepository(private val context: Context) {
         val ok = item.file.delete()
         if (ok) metadata.remove(item.id)
         return ok
+    }
+
+    /** In-progress episodes/movies across the whole library, most recently played first. */
+    fun getContinueWatching(shows: List<ShowItem>, limit: Int = 12): List<ContinueWatchingEntry> {
+        return shows
+            .flatMap { show -> show.allEpisodes.filter { it.isInProgress }.map { ContinueWatchingEntry(show, it) } }
+            .sortedByDescending { it.episode.lastPlayedAt }
+            .take(limit)
+    }
+
+    private val subtitleExtensions = setOf("srt", "vtt", "ass", "ssa")
+
+    /**
+     * Finds sidecar subtitle files sitting next to a video — same base filename,
+     * a recognized subtitle extension, optionally with a language tag in between
+     * (e.g. "Show.S01E01.srt" or "Show.S01E01.en.srt" both match "Show.S01E01.mp4").
+     */
+    fun findSubtitleFiles(videoFile: File): List<File> {
+        val dir = videoFile.parentFile ?: return emptyList()
+        val base = videoFile.nameWithoutExtension
+        return dir.listFiles { f ->
+            f.isFile &&
+                f.extension.lowercase() in subtitleExtensions &&
+                f.nameWithoutExtension.startsWith(base, ignoreCase = true)
+        }?.sortedBy { it.name.lowercase() } ?: emptyList()
     }
 
     // --- Direct file-based helpers used by the player screen ---

@@ -14,9 +14,13 @@ data class VideoItem(
     val watched: Boolean,
     val positionMs: Long,
     val durationMs: Long,
+    val lastPlayedAt: Long,
     val thumbnailPath: String?
 ) {
     val id: String get() = file.absolutePath
+    val progressFraction: Float
+        get() = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+    val isInProgress: Boolean get() = !watched && positionMs > 15_000L && durationMs > 0
 }
 
 data class SeasonGroup(
@@ -40,4 +44,11 @@ data class ShowItem(
     val totalItemCount: Int get() = standalone.size + seasons.sumOf { it.episodes.size }
     val watchedCount: Int get() = standalone.count { it.watched } + seasons.sumOf { s -> s.episodes.count { it.watched } }
     val isSingleMovie: Boolean get() = seasons.isEmpty() && standalone.size == 1
+    val allEpisodes: List<VideoItem> get() = standalone + seasons.flatMap { it.episodes }
 }
+
+/** A single row entry for the "Continue Watching" rail: which show it belongs to + which episode. */
+data class ContinueWatchingEntry(
+    val show: ShowItem,
+    val episode: VideoItem
+)

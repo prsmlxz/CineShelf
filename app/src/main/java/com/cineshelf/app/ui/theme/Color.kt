@@ -2,22 +2,39 @@ package com.cineshelf.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Base surfaces - deep, near-black neutrals (not pure black, avoids OLED smear + feels premium)
-val BackgroundPrimary = Color(0xFF0B0B0F)
-val BackgroundSecondary = Color(0xFF141419)
-val SurfaceCard = Color(0xFF1C1C22)
-val SurfaceCardElevated = Color(0xFF24242B)
-val SurfaceStroke = Color(0xFF2E2E36)
+// Base surfaces — true near-black neutrals, layered rather than flat,
+// so cards read as "elevated glass" instead of pasted-on rectangles.
+val BackgroundPrimary = Color(0xFF000000)
+val BackgroundSecondary = Color(0xFF0A0A0C)
+val SurfaceCard = Color(0xFF121214)
+val SurfaceCardElevated = Color(0xFF1C1C1F)
+val SurfaceStroke = Color(0xFFFFFFFF).copy(alpha = 0.08f)
+val SurfaceStrokeStrong = Color(0xFFFFFFFF).copy(alpha = 0.14f)
 
-// Accent - a restrained, elegant blue (iOS system blue territory) plus a warm secondary
-val AccentPrimary = Color(0xFF3D8BFF)
-val AccentSoft = Color(0xFF3D8BFF).copy(alpha = 0.15f)
-val AccentSuccess = Color(0xFF34C77B)
-val AccentDanger = Color(0xFFFF4D5E)
+// Glass — translucent layers meant to sit over a blurred background.
+val GlassFillLight = Color(0xFFFFFFFF).copy(alpha = 0.10f)
+val GlassFill = Color(0xFFFFFFFF).copy(alpha = 0.07f)
+val GlassFillStrong = Color(0xFFFFFFFF).copy(alpha = 0.12f)
+val GlassStroke = Color(0xFFFFFFFF).copy(alpha = 0.14f)
+val HairlineLight = Color(0xFFFFFFFF).copy(alpha = 0.08f)
+val HairlineMid = Color(0xFFFFFFFF).copy(alpha = 0.16f)
+val HairlineStrong = Color(0xFFFFFFFF).copy(alpha = 0.24f)
+val ScrimSoft = Color(0xFF000000).copy(alpha = 0.35f)
+val ScrimMedium = Color(0xFF000000).copy(alpha = 0.5f)
+val ScrimStrong = Color(0xFF000000).copy(alpha = 0.72f)
 
-// Text
+// A single restrained accent (Apple system blue territory) — used sparingly:
+// active states, progress, and the one or two things per screen that matter.
+val AccentPrimary = Color(0xFF0A84FF)
+val AccentSoft = AccentPrimary.copy(alpha = 0.16f)
+val AccentSuccess = Color(0xFF30D158)
+val AccentDanger = Color(0xFFFF453A)
+val AccentWarning = Color(0xFFFFD60A)
+
+// Text — Apple system gray scale equivalents
 val TextPrimary = Color(0xFFF5F5F7)
-val TextSecondary = Color(0xFF9C9CA6)
-val TextTertiary = Color(0xFF6C6C76)
+val TextSecondary = Color(0xFFAEAEB2)
+val TextTertiary = Color(0xFF6E6E73)
+val TextQuaternary = Color(0xFF48484A)
 
-val Scrim = Color(0xFF000000).copy(alpha = 0.55f)
+val Scrim = ScrimStrong

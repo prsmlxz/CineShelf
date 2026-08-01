@@ -8,8 +8,8 @@ import kotlin.concurrent.withLock
 
 /**
  * Lightweight JSON key-value store (keyed by absolute file path) that persists
- * per-video watch state, playback position, and duration. Deliberately avoids
- * a full database dependency to keep the build simple and fast.
+ * per-video watch state, playback position, duration, and last-played time.
+ * Deliberately avoids a full database dependency to keep the build simple.
  */
 class MetadataStore(context: Context) {
 
@@ -49,6 +49,10 @@ class MetadataStore(context: Context) {
         cache.optJSONObject(path)?.optLong("durationMs", 0L) ?: 0L
     }
 
+    fun getLastPlayedAt(path: String): Long = lock.withLock {
+        cache.optJSONObject(path)?.optLong("lastPlayedAt", 0L) ?: 0L
+    }
+
     fun setWatched(path: String, watched: Boolean) = lock.withLock {
         val entry = cache.optJSONObject(path) ?: JSONObject().also { cache.put(path, it) }
         entry.put("watched", watched)
@@ -62,6 +66,7 @@ class MetadataStore(context: Context) {
         val entry = cache.optJSONObject(path) ?: JSONObject().also { cache.put(path, it) }
         entry.put("positionMs", positionMs)
         entry.put("durationMs", durationMs)
+        entry.put("lastPlayedAt", System.currentTimeMillis())
         if (durationMs > 0 && positionMs >= durationMs * 0.92) {
             entry.put("watched", true)
             entry.put("positionMs", 0L)

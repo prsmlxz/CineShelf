@@ -3,6 +3,7 @@ package com.cineshelf.app.ui.library
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.cineshelf.app.data.ContinueWatchingEntry
 import com.cineshelf.app.data.LibraryRepository
 import com.cineshelf.app.data.ShowItem
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ import kotlinx.coroutines.withContext
 
 data class LibraryUiState(
     val shows: List<ShowItem> = emptyList(),
+    val continueWatching: List<ContinueWatchingEntry> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -32,7 +34,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val shows = withContext(Dispatchers.IO) { repository.scanLibrary() }
-            _uiState.value = LibraryUiState(shows = shows, isLoading = false)
+            val continueWatching = withContext(Dispatchers.IO) { repository.getContinueWatching(shows) }
+            _uiState.value = LibraryUiState(shows = shows, continueWatching = continueWatching, isLoading = false)
         }
     }
 

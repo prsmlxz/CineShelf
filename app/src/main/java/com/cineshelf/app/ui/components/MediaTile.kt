@@ -7,16 +7,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,11 +23,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,7 +50,7 @@ fun MediaTile(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(Radius.md))
                 .background(SurfaceCard)
                 .combinedClickable(
                     onClick = {
@@ -73,107 +70,85 @@ fun MediaTile(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(listOf(SurfaceCard, SurfaceCardElevated))
-                        )
+                        .background(Brush.linearGradient(listOf(SurfaceCard, SurfaceCardElevated)))
                 )
             }
 
-            // Bottom gradient scrim for legibility
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
-                            startY = 40f
-                        )
-                    )
+                    .background(Brush.verticalGradient(colors = listOf(Color.Transparent, ScrimStrong), startY = 50f))
             )
-
-            // Progress bar for partially watched items
-            if (!item.watched && item.durationMs > 0 && item.positionMs > 0) {
-                val progress = (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
-                Box(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .background(Color.White.copy(alpha = 0.25f))
-                )
-                Box(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth(progress)
-                        .height(3.dp)
-                        .background(AccentPrimary)
-                )
-            }
 
             if (item.watched) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .size(20.dp)
-                        .background(AccentSuccess, CircleShape),
+                        .size(19.dp)
+                        .glassPanel(shape = CircleShape, fill = AccentSuccess.copy(alpha = 0.9f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Watched",
-                        tint = Color.White,
-                        modifier = Modifier.size(13.dp)
-                    )
+                    Icon(Icons.Outlined.Check, contentDescription = "Watched", tint = Color.White, modifier = Modifier.size(11.dp))
                 }
+            } else if (item.isInProgress) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth(item.progressFraction)
+                        .height(2.dp)
+                        .background(AccentPrimary)
+                )
             }
 
             if (!overlayVisible) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(38.dp)
-                        .background(Color.Black.copy(alpha = 0.35f), CircleShape),
+                        .size(34.dp)
+                        .glassPanel(shape = CircleShape, fill = ScrimMedium),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Icon(Icons.Outlined.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
 
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = overlayVisible,
-                enter = fadeIn(tween(180)) + scaleIn(tween(180), initialScale = 0.9f),
-                exit = fadeOut(tween(140)) + scaleOut(tween(140), targetScale = 0.9f)
+                enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.92f),
+                exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.92f)
             ) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.55f))
+                        .background(ScrimStrong)
                 ) {
                     OverlayIconButton(
-                        icon = Icons.Default.CheckCircle,
+                        icon = Icons.Outlined.CheckCircle,
                         tint = if (item.watched) AccentSuccess else Color.White,
                         contentDescription = "Toggle watched",
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(8.dp),
+                            .padding(7.dp),
                         onClick = {
                             onToggleWatched()
                             overlayVisible = false
                         }
                     )
                     OverlayIconButton(
-                        icon = Icons.Default.Delete,
+                        icon = Icons.Outlined.DeleteOutline,
                         tint = AccentDanger,
                         contentDescription = "Delete",
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 10.dp),
+                            .padding(bottom = 9.dp),
                         onClick = {
                             onDelete()
                             overlayVisible = false
@@ -183,7 +158,7 @@ fun MediaTile(
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(Spacing.xxs))
 
         Text(
             item.displayTitle,
@@ -212,11 +187,11 @@ private fun OverlayIconButton(
 ) {
     Box(
         modifier = modifier
-            .size(34.dp)
-            .background(Color.White.copy(alpha = 0.12f), CircleShape)
-            .clickable(onClick = onClick),
+            .size(32.dp)
+            .premiumPressable(scaleDown = 0.88f, onClick = onClick)
+            .glassPanel(shape = CircleShape, fill = GlassFillLight),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(16.dp))
     }
 }
