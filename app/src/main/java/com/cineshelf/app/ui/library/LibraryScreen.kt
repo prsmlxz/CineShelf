@@ -90,7 +90,7 @@ fun LibraryScreen(
                         item(span = { GridItemSpan(2) }) {
                             ContinueWatchingSection(
                                 entries = state.continueWatching,
-                                onPlay = { onPlay(it.file.absolutePath) }
+                                onPlay = { onPlay(it.absolutePath) }
                             )
                         }
                     }
