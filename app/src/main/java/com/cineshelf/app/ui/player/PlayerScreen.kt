@@ -196,15 +196,9 @@ fun PlayerScreen(
         ImmersiveModeController.immersive.value = true
         val window = activity?.window
         window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-<<<<<<< HEAD
         val insetsController = window?.let { WindowInsetsControllerCompat(it, view) }
         insetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         insetsController?.hide(WindowInsetsCompat.Type.systemBars())
-=======
-        val controller = window?.let { WindowInsetsControllerCompat(it, view) }
-       controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
->>>>>>> 0da4845202f9e2c032a860a95ecf4439de89f177
 
         onDispose {
             ImmersiveModeController.immersive.value = false
