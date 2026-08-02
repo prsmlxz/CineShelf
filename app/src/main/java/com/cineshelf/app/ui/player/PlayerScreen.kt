@@ -2,7 +2,6 @@ package com.cineshelf.app.ui.player
 
 import android.app.Activity
 import android.app.PictureInPictureParams
-import android.content.pm.ActivityInfo
 import android.graphics.Color as AndroidColor
 import android.media.AudioManager
 import android.net.Uri
@@ -23,12 +22,11 @@ import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.LockOpen
-import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Replay10
 import androidx.compose.material.icons.outlined.Forward10
 import androidx.compose.material.icons.outlined.ScreenRotation
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Timer
@@ -44,6 +42,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,8 +67,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import com.cineshelf.app.ImmersiveModeController
 import com.cineshelf.app.PipModeController
+import com.cineshelf.app.buildPipRemoteActions
+import com.cineshelf.app.data.SubtitleEdgeStyle
+import com.cineshelf.app.data.SubtitleStyle
 import com.cineshelf.app.data.ThumbnailUtil
 import com.cineshelf.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -80,7 +83,7 @@ import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 
-private enum class ActiveMenu { NONE, SPEED, SUBTITLES, AUDIO, SLEEP_TIMER }
+private enum class ActiveMenu { NONE, SPEED, SUBTITLES, SUBTITLE_STYLE, AUDIO, SLEEP_TIMER }
 private enum class HudType { BRIGHTNESS, VOLUME }
 
 @Composable
@@ -94,6 +97,7 @@ fun PlayerScreen(
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
     val density = LocalDensity.current
+    val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val file = remember(filePath) { File(filePath) }
     val isInPip by PipModeController.isInPip
 
@@ -158,9 +162,9 @@ fun PlayerScreen(
     var selectedAudioKey by remember { mutableStateOf<String?>(null) }
     var sleepTimerEndAt by remember { mutableStateOf<Long?>(null) }
     var sleepTimerLabel by remember { mutableStateOf("Off") }
+    var subtitleStyle by remember { mutableStateOf(viewModel.getSubtitleStyle()) }
 
     var isDraggingSlider by remember { mutableStateOf(false) }
-    var dragPosition by remember { mutableStateOf(0f) }
 
     var seekBubble by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     var hud by remember { mutableStateOf<HudType?>(null) }
@@ -171,8 +175,10 @@ fun PlayerScreen(
     var scrubDeltaMs by remember { mutableStateOf(0L) }
     var scrubThumbnails by remember { mutableStateOf<List<Pair<Long, String>>>(emptyList()) }
 
-    // Generate a sparse set of preview frames once we know the duration, off the
-    // main thread. Cached on disk, so this is a one-time cost per video.
+    // Generate a sparse-but-dense set of preview frames once we know the duration, off the
+    // main thread. Cached on disk, so this is a one-time cost per video. 30 frames spread
+    // across the runtime gives a genuinely frame-accurate *feel* while scrubbing without
+    // paying to decode dozens more than anyone will ever land exactly on.
     LaunchedEffect(durationMs) {
         if (durationMs > 0 && scrubThumbnails.isEmpty()) {
             scrubThumbnails = withContext(Dispatchers.IO) {
@@ -191,7 +197,7 @@ fun PlayerScreen(
         if (currentBrightness in 0f..1f) brightnessLevel = currentBrightness
     }
 
-    // --- Immersive fullscreen (robust: MainActivity reasserts this on focus regain) ---
+    // --- Immersive fullscreen (robust: MainActivity reasserts this on focus/resume) ---
     DisposableEffect(Unit) {
         ImmersiveModeController.immersive.value = true
         val window = activity?.window
@@ -204,7 +210,17 @@ fun PlayerScreen(
             ImmersiveModeController.immersive.value = false
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    // Defensive re-hide: some OEM skins quietly bring the system bars back on almost any
+    // layout/state change. Re-asserting hidden every time the control chrome toggles costs
+    // nothing (it's a no-op if already hidden) and closes that gap without polling.
+    LaunchedEffect(controlsVisible, locked) {
+        val window = activity?.window
+        if (window != null) {
+            WindowInsetsControllerCompat(window, view).hide(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -308,24 +324,69 @@ fun PlayerScreen(
     fun cycleOrientation() {
         orientationMode = orientationMode.next()
         activity?.requestedOrientation = when (orientationMode) {
-            OrientationMode.AUTO -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
-            OrientationMode.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            OrientationMode.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            OrientationMode.AUTO -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR
+            OrientationMode.LANDSCAPE -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            OrientationMode.PORTRAIT -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
         controlsVisible = true
     }
 
-    fun enterPip() {
-        val act = activity ?: return
+    fun computePipAspectRatio(): Rational {
         val size = videoSize
-        val ratio = if (size != null && size.width > 0 && size.height > 0) {
+        return if (size != null && size.width > 0 && size.height > 0) {
             val r = size.width.toFloat() / size.height.toFloat()
             val clamped = r.coerceIn(1f / 2.39f, 2.39f)
             if (clamped == r) Rational(size.width, size.height) else Rational((clamped * 100).toInt(), 100)
         } else {
             Rational(16, 9)
         }
-        act.enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(ratio).build())
+    }
+
+    fun buildPipParams(): PictureInPictureParams =
+        PictureInPictureParams.Builder()
+            .setAspectRatio(computePipAspectRatio())
+            .setActions(buildPipRemoteActions(context, exoPlayer.isPlaying))
+            .build()
+
+    fun enterPip() {
+        val act = activity ?: return
+        try {
+            act.enterPictureInPictureMode(buildPipParams())
+        } catch (_: Exception) {
+            // Not supported/permitted right now — nothing worth crashing over.
+        }
+    }
+
+    fun handlePipAction(action: PipAction) {
+        when (action) {
+            PipAction.PLAY_PAUSE -> if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+            PipAction.REWIND -> seekRelative(-10_000L, true)
+            PipAction.FORWARD -> seekRelative(10_000L, false)
+        }
+        activity?.let {
+            try { it.setPictureInPictureParams(buildPipParams()) } catch (_: Exception) {}
+        }
+    }
+
+    // Bridge this screen's PiP state (aspect ratio, transport actions) to the Activity,
+    // which is the only place that can actually call enterPictureInPictureMode(). Cleared
+    // on disposal so a stale callback can never fire after leaving the player.
+    DisposableEffect(Unit) {
+        PipModeController.requestEnterPip = { enterPip() }
+        PipModeController.onPipAction = { action -> handlePipAction(action) }
+        onDispose {
+            PipModeController.requestEnterPip = null
+            PipModeController.onPipAction = null
+        }
+    }
+
+    // Keep the system-drawn PiP play/pause icon in sync with real playback state.
+    LaunchedEffect(isPlaying, isInPip) {
+        if (isInPip) {
+            activity?.let {
+                try { it.setPictureInPictureParams(buildPipParams()) } catch (_: Exception) {}
+            }
+        }
     }
 
     fun selectSubtitle(key: String) {
@@ -355,6 +416,11 @@ fun PlayerScreen(
         activeMenu = ActiveMenu.NONE
     }
 
+    fun updateSubtitleStyle(newStyle: SubtitleStyle) {
+        subtitleStyle = newStyle
+        viewModel.saveSubtitleStyle(newStyle)
+    }
+
     fun adjustBrightness(delta: Float) {
         val act = activity ?: return
         brightnessLevel = (brightnessLevel + delta).coerceIn(0.02f, 1f)
@@ -378,16 +444,6 @@ fun PlayerScreen(
                     useController = false
                     subtitleView?.setApplyEmbeddedStyles(false)
                     subtitleView?.setApplyEmbeddedFontSizes(false)
-                    subtitleView?.setStyle(
-                        CaptionStyleCompat(
-                            AndroidColor.WHITE,
-                            AndroidColor.TRANSPARENT,
-                            AndroidColor.TRANSPARENT,
-                            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
-                            AndroidColor.argb(200, 0, 0, 0),
-                            null
-                        )
-                    )
                 }
             },
             update = { playerView ->
@@ -400,12 +456,16 @@ fun PlayerScreen(
                 val bottomPx = with(density) { bottomDp.dp.roundToPx() }
                 val sv = playerView.subtitleView
                 sv?.setPadding(sv.paddingLeft, sv.paddingTop, sv.paddingRight, bottomPx)
+                sv?.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitleStyle.sizeScale)
+                sv?.setStyle(captionStyleFor(subtitleStyle))
             },
             modifier = Modifier.fillMaxSize()
         )
 
         if (isInPip) {
-            // Keep it bare in PiP — no room or need for overlay chrome.
+            // Keep it bare in PiP — the system draws its own transport controls
+            // from the RemoteActions we supply; there's no room or need for
+            // our own overlay chrome on top of that.
             return@Box
         }
 
@@ -425,22 +485,27 @@ fun PlayerScreen(
                     }
             )
         } else {
-            // Split into three horizontal zones so the *common* interaction — tapping to
-            // show/hide controls — fires the instant a finger lifts, with no wait. Only the
-            // side zones (dedicated to double-tap seek) pay the double-tap disambiguation
-            // delay, and only when a second tap doesn't follow.
+            // Three horizontal zones. Every zone toggles the controls on a single tap —
+            // that's the interaction people reach for constantly, so it must never be a
+            // dead spot. The two edge zones *additionally* recognize a double-tap for
+            // 10s seek, which means they pay Android's standard tap/double-tap
+            // disambiguation delay (~300ms); the center zone has no double-tap
+            // registered on it at all, so it stays instant, with no wait.
             Row(modifier = Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
-                        .weight(0.3f)
+                        .weight(0.32f)
                         .fillMaxHeight()
                         .pointerInput(Unit) {
-                            detectTapGestures(onDoubleTap = { seekRelative(-10_000L, true) })
+                            detectTapGestures(
+                                onTap = { if (activeMenu == ActiveMenu.NONE) controlsVisible = !controlsVisible },
+                                onDoubleTap = { seekRelative(-10_000L, true) }
+                            )
                         }
                 )
                 Box(
                     modifier = Modifier
-                        .weight(0.4f)
+                        .weight(0.36f)
                         .fillMaxHeight()
                         .pointerInput(Unit) {
                             detectTapGestures(
@@ -450,10 +515,13 @@ fun PlayerScreen(
                 )
                 Box(
                     modifier = Modifier
-                        .weight(0.3f)
+                        .weight(0.32f)
                         .fillMaxHeight()
                         .pointerInput(Unit) {
-                            detectTapGestures(onDoubleTap = { seekRelative(10_000L, false) })
+                            detectTapGestures(
+                                onTap = { if (activeMenu == ActiveMenu.NONE) controlsVisible = !controlsVisible },
+                                onDoubleTap = { seekRelative(10_000L, false) }
+                            )
                         }
                 )
             }
@@ -485,7 +553,7 @@ fun PlayerScreen(
                             accumDx += dragAmount.x
                             accumDy += dragAmount.y
                             if (axis == null) {
-                                if (abs(accumDx) > 16f || abs(accumDy) > 16f) {
+                                if (abs(accumDx) > touchSlopPx || abs(accumDy) > touchSlopPx) {
                                     axis = if (abs(accumDx) > abs(accumDy)) DragAxis.HORIZONTAL else DragAxis.VERTICAL
                                     if (axis == DragAxis.VERTICAL) {
                                         side = if (change.position.x < size.width / 2f) DragSide.BRIGHTNESS else DragSide.VOLUME
@@ -555,10 +623,11 @@ fun PlayerScreen(
             PlayerControls(
                 title = file.nameWithoutExtension,
                 isPlaying = isPlaying,
-                currentPositionMs = if (isDraggingSlider) dragPosition.toLong() else currentPositionMs,
+                currentPositionMs = currentPositionMs,
                 durationMs = durationMs,
                 bufferedPercentage = bufferedPercentage,
                 aspectMode = aspectMode,
+                scrubThumbnails = scrubThumbnails,
                 onBack = onBack,
                 onLock = { toggleLock() },
                 onPip = { enterPip() },
@@ -571,10 +640,10 @@ fun PlayerScreen(
                 onCycleAspect = { cycleAspect() },
                 onCycleOrientation = { cycleOrientation() },
                 onOpenSleepTimer = { activeMenu = ActiveMenu.SLEEP_TIMER },
-                onSliderStart = { isDraggingSlider = true },
-                onSliderChange = { dragPosition = it },
-                onSliderFinished = {
-                    exoPlayer.seekTo(dragPosition.toLong())
+                onScrubStart = { isDraggingSlider = true },
+                onScrubEnd = { ms ->
+                    exoPlayer.seekTo(ms)
+                    currentPositionMs = ms
                     isDraggingSlider = false
                 }
             )
@@ -601,9 +670,25 @@ fun PlayerScreen(
                     options = options,
                     selectedKey = selectedSubtitleKey,
                     onSelect = { selectSubtitle(it) },
-                    onDismiss = { activeMenu = ActiveMenu.NONE }
+                    onDismiss = { activeMenu = ActiveMenu.NONE },
+                    headerTrailing = {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .premiumPressableNoScale(onClick = { activeMenu = ActiveMenu.SUBTITLE_STYLE })
+                                .glassPanel(shape = CircleShape, fill = GlassFillLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Outlined.Settings, contentDescription = "Subtitle style", tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
                 )
             }
+            ActiveMenu.SUBTITLE_STYLE -> SubtitleStyleSheet(
+                style = subtitleStyle,
+                onStyleChange = { updateSubtitleStyle(it) },
+                onDismiss = { activeMenu = ActiveMenu.NONE }
+            )
             ActiveMenu.AUDIO -> {
                 val audioOpts = audioOptionsFrom(currentTracks)
                 val options = audioOpts.map { PopupOption(it.group.id + "-" + it.trackIndex, it.label) }
@@ -635,6 +720,28 @@ fun PlayerScreen(
             )
             ActiveMenu.NONE -> {}
         }
+    }
+}
+
+private fun captionStyleFor(style: SubtitleStyle): CaptionStyleCompat {
+    val foreground = AndroidColor.WHITE
+    return when (style.edgeStyle) {
+        SubtitleEdgeStyle.OUTLINE -> CaptionStyleCompat(
+            foreground, AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_OUTLINE, AndroidColor.argb(200, 0, 0, 0), null
+        )
+        SubtitleEdgeStyle.DROP_SHADOW -> CaptionStyleCompat(
+            foreground, AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, AndroidColor.argb(200, 0, 0, 0), null
+        )
+        SubtitleEdgeStyle.BACKGROUND_BOX -> CaptionStyleCompat(
+            foreground, AndroidColor.argb(160, 0, 0, 0), AndroidColor.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_NONE, AndroidColor.TRANSPARENT, null
+        )
+        SubtitleEdgeStyle.NONE -> CaptionStyleCompat(
+            foreground, AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT,
+            CaptionStyleCompat.EDGE_TYPE_NONE, AndroidColor.TRANSPARENT, null
+        )
     }
 }
 
@@ -679,6 +786,7 @@ private fun PlayerControls(
     durationMs: Long,
     bufferedPercentage: Int,
     aspectMode: AspectMode,
+    scrubThumbnails: List<Pair<Long, String>>,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onPip: () -> Unit,
@@ -691,9 +799,8 @@ private fun PlayerControls(
     onCycleAspect: () -> Unit,
     onCycleOrientation: () -> Unit,
     onOpenSleepTimer: () -> Unit,
-    onSliderStart: () -> Unit,
-    onSliderChange: (Float) -> Unit,
-    onSliderFinished: () -> Unit
+    onScrubStart: () -> Unit,
+    onScrubEnd: (Long) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
         // Subtle top gradient — not an opaque bar
@@ -734,20 +841,7 @@ private fun PlayerControls(
             horizontalArrangement = Arrangement.spacedBy(Spacing.xxl)
         ) {
             TransportIconButton(icon = Icons.Outlined.Replay10, contentDescription = "Back 10 seconds", size = 46.dp, iconSize = 22.dp, onClick = onSkipBack)
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .premiumPressableNoScale(onClick = onPlayPause)
-                    .glassPanel(shape = CircleShape, fill = Color.White.copy(alpha = 0.92f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.Black,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+            PlayPauseButton(isPlaying = isPlaying, onClick = onPlayPause)
             TransportIconButton(icon = Icons.Outlined.Forward10, contentDescription = "Forward 10 seconds", size = 46.dp, iconSize = 22.dp, onClick = onSkipForward)
         }
 
@@ -774,21 +868,29 @@ private fun PlayerControls(
 
             Spacer(Modifier.height(Spacing.sm))
 
-            Slider(
-                value = currentPositionMs.toFloat().coerceIn(0f, durationMs.toFloat().coerceAtLeast(1f)),
-                onValueChange = { onSliderStart(); onSliderChange(it) },
-                onValueChangeFinished = onSliderFinished,
-                valueRange = 0f..durationMs.toFloat().coerceAtLeast(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = AccentPrimary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.22f)
-                ),
-                modifier = Modifier.fillMaxWidth().height(20.dp)
+            Timebar(
+                positionMs = currentPositionMs,
+                durationMs = durationMs,
+                bufferedPercentage = bufferedPercentage,
+                thumbnails = scrubThumbnails,
+                onScrubStart = onScrubStart,
+                onScrubMove = {},
+                onScrubEnd = onScrubEnd,
+                modifier = Modifier.fillMaxWidth()
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTime(currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelSmall)
-                Text(formatTime(durationMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    formatTime(currentPositionMs),
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+                Text(
+                    formatTime(durationMs),
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
             }
         }
     }
@@ -799,7 +901,7 @@ private fun QuickIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
     Box(
         modifier = Modifier
             .size(34.dp)
-            .premiumPressableNoScale(onClick = onClick),
+            .premiumPressable(scaleDown = 0.88f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = label, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(20.dp))
@@ -817,7 +919,7 @@ private fun TransportIconButton(
     Box(
         modifier = Modifier
             .size(size)
-            .premiumPressableNoScale(onClick = onClick)
+            .premiumPressable(scaleDown = 0.88f, onClick = onClick)
             .glassPanel(shape = CircleShape, fill = GlassFillLight),
         contentAlignment = Alignment.Center
     ) {
@@ -825,7 +927,7 @@ private fun TransportIconButton(
     }
 }
 
-private fun formatTime(ms: Long): String {
+internal fun formatTime(ms: Long): String {
     if (ms <= 0) return "0:00"
     val totalSeconds = ms / 1000
     val hours = totalSeconds / 3600

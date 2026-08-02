@@ -70,7 +70,7 @@ object ThumbnailUtil {
         context: Context,
         videoFile: File,
         durationMs: Long,
-        count: Int = 10
+        count: Int = 30
     ): List<Pair<Long, String>> {
         if (durationMs <= 0) return emptyList()
         val dir = cacheDir(context)

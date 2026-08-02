@@ -31,6 +31,12 @@ val AccentSuccess = Color(0xFF30D158)
 val AccentDanger = Color(0xFFFF453A)
 val AccentWarning = Color(0xFFFFD60A)
 
+// Play/pause button — a low-opacity neutral gray glass fill, deliberately
+// NOT a solid white disc, plus a soft accent glow used behind it and behind
+// the timebar thumb while actively dragging.
+val PlayButtonFill = Color(0xFF8E8E93).copy(alpha = 0.30f)
+val AccentGlow = AccentPrimary.copy(alpha = 0.45f)
+
 // Text — Apple system gray scale equivalents
 val TextPrimary = Color(0xFFF5F5F7)
 val TextSecondary = Color(0xFFAEAEB2)

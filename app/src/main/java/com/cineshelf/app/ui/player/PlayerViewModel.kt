@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cineshelf.app.data.LibraryRepository
+import com.cineshelf.app.data.SubtitlePrefs
+import com.cineshelf.app.data.SubtitleStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -11,6 +13,7 @@ import java.io.File
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = LibraryRepository(application)
+    private val subtitlePrefs = SubtitlePrefs(application)
 
     fun getInitialPosition(file: File): Long = repository.getInitialPosition(file)
 
@@ -19,6 +22,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun saveProgress(file: File, positionMs: Long, durationMs: Long) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveProgress(file, positionMs, durationMs)
+        }
+    }
+
+    fun getSubtitleStyle(): SubtitleStyle = subtitlePrefs.get()
+
+    fun saveSubtitleStyle(style: SubtitleStyle) {
+        viewModelScope.launch(Dispatchers.IO) {
+            subtitlePrefs.save(style)
         }
     }
 }
