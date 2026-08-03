@@ -46,6 +46,30 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    // Robolectric renders real Compose UI on the JVM, so the design can be
+    // inspected as PNGs without a device or emulator.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+            all {
+                // Roborazzi reads these inside the test JVM, so passing them via the
+                // Gradle daemon's -D flags alone is not enough.
+                it.systemProperty("robolectric.graphicsMode", "NATIVE")
+                it.systemProperty("roborazzi.test.record", "true")
+                it.systemProperty(
+                    "roborazzi.record.filePathStrategy",
+                    "relativePathFromRoborazziContextOutputDirectory"
+                )
+                it.systemProperty(
+                    "roborazzi.output.dir",
+                    layout.buildDirectory.dir("screenshots").get().asFile.absolutePath
+                )
+                it.maxHeapSize = "2g"
+            }
+        }
+    }
 }
 
 dependencies {
@@ -72,4 +96,13 @@ dependencies {
     implementation("androidx.media3:media3-common:1.4.1")
 
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Screenshot/unit test only — never packaged into the APK.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.26.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.26.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

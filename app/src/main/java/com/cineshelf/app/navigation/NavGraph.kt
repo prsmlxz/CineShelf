@@ -80,7 +80,14 @@ fun CineShelfNavHost(modifier: Modifier = Modifier) {
             val filePath = URLDecoder.decode(encoded, "UTF-8")
             PlayerScreen(
                 filePath = filePath,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onPlayNext = { nextPath ->
+                    navController.navigate(Routes.player(nextPath)) {
+                        // Replace the finished episode rather than stacking, so Back
+                        // returns to the show instead of walking every episode watched.
+                        popUpTo(Routes.PLAYER) { inclusive = true }
+                    }
+                }
             )
         }
     }

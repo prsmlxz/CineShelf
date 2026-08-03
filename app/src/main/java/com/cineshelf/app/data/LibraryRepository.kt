@@ -203,6 +203,19 @@ class LibraryRepository(private val context: Context) {
 
     fun getInitialPosition(file: File): Long = metadata.getPosition(file.absolutePath)
 
+    /**
+     * The next video in the same folder, ordered the way the folder is
+     * displayed. Returns null when this is the last one.
+     */
+    fun findNextEpisode(file: File): File? {
+        val siblings = file.parentFile?.listFiles()
+            ?.filter { isVideoFile(it) }
+            ?.sortedWith(compareBy({ parseSeasonEpisode(it.name)?.second ?: Int.MAX_VALUE }, { it.name.lowercase() }))
+            ?: return null
+        val index = siblings.indexOfFirst { it.absolutePath == file.absolutePath }
+        return siblings.getOrNull(index + 1)
+    }
+
     fun saveProgress(file: File, positionMs: Long, durationMs: Long) {
         if (durationMs > 0) metadata.setProgress(file.absolutePath, positionMs, durationMs)
     }

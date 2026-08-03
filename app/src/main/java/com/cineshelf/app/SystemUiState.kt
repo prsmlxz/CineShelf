@@ -1,42 +1,34 @@
 package com.cineshelf.app
 
-import android.util.Rational
+import android.app.PictureInPictureParams
 import androidx.compose.runtime.mutableStateOf
-import com.cineshelf.app.ui.player.PipAction
 
 /**
- * Single source of truth for whether the app should currently be in
- * immersive (system-bars-hidden) fullscreen mode.
+ * Whether the app should currently be in immersive (system-bars-hidden) mode.
  *
- * Why this exists: simply calling `WindowInsetsControllerCompat.hide(...)`
- * once when the player screen appears is not reliable on its own — Android
- * silently re-shows the system bars whenever the window loses and regains
- * focus (a notification shade pull, a screenshot, split-screen focus, and
- * on some OEM skins even routine recomposition). The fix is to reassert
- * the hidden state from the Activity's `onWindowFocusChanged`/`onResume`,
- * which needs to know, at the Activity level, whether we're currently on
- * the player screen. This object is that shared flag.
+ * Calling `WindowInsetsControllerCompat.hide(...)` once is not reliable on its
+ * own — Android re-shows the system bars whenever the window loses and regains
+ * focus (notification shade, screenshot, split-screen, and on some OEM skins
+ * routine recomposition). The Activity reasserts the hidden state from
+ * `onWindowFocusChanged`, reading this flag.
+ *
+ * Defaults to true: the whole app is fullscreen, not just the player.
  */
 object ImmersiveModeController {
-    val immersive = mutableStateOf(false)
+    val immersive = mutableStateOf(true)
 }
 
-/**
- * Bridges the player (a Composable, which owns the ExoPlayer instance and
- * knows the video's aspect ratio and playback state) with the Activity
- * (the only place `enterPictureInPictureMode` and the PiP action broadcast
- * receiver can live). The player registers callbacks here while it's on
- * screen and clears them on disposal; the Activity only ever calls through
- * these, never touches ExoPlayer directly.
- */
+/** Tracks Picture-in-Picture state so the player can simplify its UI while mini. */
 object PipModeController {
     val isInPip = mutableStateOf(false)
-    val isPlaying = mutableStateOf(false)
-    val aspectRatio = mutableStateOf<Rational?>(null)
 
-    /** Set by the player screen; invoked by MainActivity.onUserLeaveHint(). */
-    var requestEnterPip: (() -> Unit)? = null
+    /** True only while the player screen is on top — gates auto-PiP on leave. */
+    val playerActive = mutableStateOf(false)
 
-    /** Set by the player screen; invoked when a system PiP action button is tapped. */
-    var onPipAction: ((PipAction) -> Unit)? = null
+    /**
+     * Supplied by the player so the Activity can enter PiP with real transport
+     * actions. Without this, PiP shows a window with no play button.
+     */
+    @Volatile
+    var paramsProvider: (() -> PictureInPictureParams)? = null
 }

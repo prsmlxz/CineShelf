@@ -22,31 +22,17 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Locate project root
-        run: |
-          PROJECT_DIR=$(dirname "$(find . -maxdepth 4 -name 'settings.gradle.kts' | head -n1)")
-          if [ -z "$PROJECT_DIR" ] || [ "$PROJECT_DIR" = "." ] && [ ! -f "./settings.gradle.kts" ]; then
-            echo "Could not find settings.gradle.kts anywhere in the repo"
-            find . -maxdepth 4
-            exit 1
-          fi
-          echo "Found project at: $PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
       - name: Generate Gradle wrapper
-        working-directory: ${{ env.PROJECT_DIR }}
         run: gradle wrapper --gradle-version 8.7
 
       - name: Grant execute permission for gradlew
-        working-directory: ${{ env.PROJECT_DIR }}
         run: chmod +x gradlew
 
       - name: Build debug APK
-        working-directory: ${{ env.PROJECT_DIR }}
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: CineShelf-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk

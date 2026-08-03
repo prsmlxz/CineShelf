@@ -1,13 +1,14 @@
 package com.cineshelf.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,99 +47,166 @@ fun MediaTile(
     modifier: Modifier = Modifier
 ) {
     var overlayVisible by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.965f else 1f,
+        animationSpec = Motion.standard(),
+        label = "tile-scale"
+    )
+    // Watched items recede rather than disappear, so a finished season still
+    // reads as a season instead of a wall of identical thumbnails.
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (item.watched && !overlayVisible) 0.55f else 1f,
+        animationSpec = Motion.gentle(),
+        label = "tile-alpha"
+    )
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale }) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(Radius.md))
+                .clip(RoundedCornerShape(Radius.lg))
                 .background(SurfaceCard)
                 .combinedClickable(
-                    onClick = {
-                        if (overlayVisible) overlayVisible = false else onClick()
-                    },
+                    interactionSource = interaction,
+                    indication = null,
+                    onClick = { if (overlayVisible) overlayVisible = false else onClick() },
                     onLongClick = { overlayVisible = true }
                 )
         ) {
-            if (item.thumbnailPath != null) {
-                AsyncImage(
-                    model = File(item.thumbnailPath),
-                    contentDescription = item.displayTitle,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = contentAlpha }) {
+                if (item.thumbnailPath != null) {
+                    AsyncImage(
+                        model = File(item.thumbnailPath),
+                        contentDescription = item.displayTitle,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(SurfaceCardElevated, SurfaceCard)))
+                    )
+                }
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Brush.linearGradient(listOf(SurfaceCard, SurfaceCardElevated)))
+                        .background(
+                            Brush.verticalGradient(listOf(Color.Transparent, ScrimStrong), startY = 60f)
+                        )
                 )
             }
 
+            // Lit rim, the same hairline used on library posters.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Brush.verticalGradient(colors = listOf(Color.Transparent, ScrimStrong), startY = 50f))
+                    .glassPanel(
+                        shape = RoundedCornerShape(Radius.lg),
+                        fill = Color.Transparent,
+                        stroke = HairlineMid
+                    )
             )
+
+            if (item.durationMs > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .glassPanel(
+                            shape = RoundedCornerShape(Radius.xs),
+                            fill = Color.Black.copy(alpha = 0.55f),
+                            stroke = HairlineLight
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        formatDuration(item.durationMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.88f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             if (item.watched) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .size(19.dp)
-                        .glassPanel(shape = CircleShape, fill = AccentSuccess.copy(alpha = 0.9f)),
+                        .size(21.dp)
+                        .glassPanel(shape = CircleShape, fill = AccentSuccess.copy(alpha = 0.92f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.Check, contentDescription = "Watched", tint = Color.White, modifier = Modifier.size(11.dp))
+                    Icon(
+                        Icons.Outlined.Check,
+                        contentDescription = "Watched",
+                        tint = Color(0xFF04160E),
+                        modifier = Modifier.size(12.dp)
+                    )
                 }
             } else if (item.isInProgress) {
                 Box(
                     Modifier
                         .align(Alignment.BottomStart)
                         .fillMaxWidth()
-                        .height(2.dp)
-                        .background(Color.White.copy(alpha = 0.2f))
-                )
-                Box(
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth(item.progressFraction)
-                        .height(2.dp)
-                        .background(AccentPrimary)
-                )
+                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(Radius.pill))
+                            .background(Color.White.copy(alpha = 0.20f))
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(item.progressFraction)
+                                .background(
+                                    Brush.horizontalGradient(listOf(AccentPrimary, AccentGlow)),
+                                    RoundedCornerShape(Radius.pill)
+                                )
+                        )
+                    }
+                }
             }
 
             if (!overlayVisible) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(34.dp)
-                        .glassPanel(shape = CircleShape, fill = ScrimMedium),
+                        .size(38.dp)
+                        .glassPanel(
+                            shape = CircleShape,
+                            fill = ControlCircleFill,
+                            stroke = ControlCircleStroke
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Outlined.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Outlined.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(19.dp)
+                    )
                 }
             }
 
             androidx.compose.animation.AnimatedVisibility(
                 visible = overlayVisible,
-                enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.92f),
-                exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.92f)
+                enter = fadeIn(Motion.fade(160)) + scaleIn(Motion.standard(), initialScale = 0.92f),
+                exit = fadeOut(Motion.fade(130)) + scaleOut(Motion.snap(), targetScale = 0.92f)
             ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(ScrimStrong)
-                ) {
+                Box(Modifier.fillMaxSize().background(ScrimStrong)) {
                     OverlayIconButton(
                         icon = Icons.Outlined.CheckCircle,
                         tint = if (item.watched) AccentSuccess else Color.White,
                         contentDescription = "Toggle watched",
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(7.dp),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(7.dp),
                         onClick = {
                             onToggleWatched()
                             overlayVisible = false
@@ -146,9 +216,7 @@ fun MediaTile(
                         icon = Icons.Outlined.DeleteOutline,
                         tint = AccentDanger,
                         contentDescription = "Delete",
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 9.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp),
                         onClick = {
                             onDelete()
                             overlayVisible = false
@@ -158,18 +226,19 @@ fun MediaTile(
             }
         }
 
-        Spacer(Modifier.height(Spacing.xxs))
+        Spacer(Modifier.height(Spacing.xs))
 
         Text(
             item.displayTitle,
             style = MaterialTheme.typography.titleSmall,
-            color = TextPrimary,
+            color = if (item.watched) TextSecondary else TextPrimary,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Text(
             item.file.name,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = TextTertiary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -179,7 +248,7 @@ fun MediaTile(
 
 @Composable
 private fun OverlayIconButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     tint: Color,
     contentDescription: String,
     modifier: Modifier = Modifier,
@@ -187,11 +256,18 @@ private fun OverlayIconButton(
 ) {
     Box(
         modifier = modifier
-            .size(32.dp)
-            .premiumPressable(scaleDown = 0.88f, onClick = onClick)
-            .glassPanel(shape = CircleShape, fill = GlassFillLight),
+            .size(34.dp)
+            .premiumPressable(scaleDown = 0.86f, onClick = onClick)
+            .glassPanel(shape = CircleShape, fill = GlassFillStrong, stroke = GlassStrokeBright),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(16.dp))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(17.dp))
     }
+}
+
+private fun formatDuration(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }

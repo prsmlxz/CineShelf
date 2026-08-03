@@ -40,9 +40,6 @@ enum class OrientationMode(val label: String) {
     }
 }
 
-/** Which system-drawn Picture-in-Picture action button was tapped. */
-enum class PipAction { PLAY_PAUSE, REWIND, FORWARD }
-
 data class SleepTimerOption(val minutes: Int?, val label: String)
 
 val sleepTimerOptions = listOf(

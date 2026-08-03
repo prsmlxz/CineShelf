@@ -2,45 +2,73 @@ package com.cineshelf.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Base surfaces — true near-black neutrals, layered rather than flat,
-// so cards read as "elevated glass" instead of pasted-on rectangles.
-val BackgroundPrimary = Color(0xFF000000)
-val BackgroundSecondary = Color(0xFF0A0A0C)
-val SurfaceCard = Color(0xFF121214)
-val SurfaceCardElevated = Color(0xFF1C1C1F)
-val SurfaceStroke = Color(0xFFFFFFFF).copy(alpha = 0.08f)
-val SurfaceStrokeStrong = Color(0xFFFFFFFF).copy(alpha = 0.14f)
+// ---------------------------------------------------------------------------
+// Aurora Glass — a deep-space palette.
+//
+// Surfaces are near-black but never pure #000: each layer carries a faint blue
+// bias so stacked panels read as depth rather than as flat cutouts. Accents are
+// drawn from an indigo -> cyan -> violet aurora ramp used for glows and active
+// states, deliberately kept off the surfaces themselves so video content stays
+// the brightest thing on screen.
+// ---------------------------------------------------------------------------
 
-// Glass — translucent layers meant to sit over a blurred background.
-val GlassFillLight = Color(0xFFFFFFFF).copy(alpha = 0.10f)
-val GlassFill = Color(0xFFFFFFFF).copy(alpha = 0.07f)
-val GlassFillStrong = Color(0xFFFFFFFF).copy(alpha = 0.12f)
-val GlassStroke = Color(0xFFFFFFFF).copy(alpha = 0.14f)
-val HairlineLight = Color(0xFFFFFFFF).copy(alpha = 0.08f)
-val HairlineMid = Color(0xFFFFFFFF).copy(alpha = 0.16f)
-val HairlineStrong = Color(0xFFFFFFFF).copy(alpha = 0.24f)
-val ScrimSoft = Color(0xFF000000).copy(alpha = 0.35f)
-val ScrimMedium = Color(0xFF000000).copy(alpha = 0.5f)
-val ScrimStrong = Color(0xFF000000).copy(alpha = 0.72f)
+// Base surfaces — cool near-blacks, layered light-to-dark for elevation.
+val BackgroundPrimary = Color(0xFF06060A)
+val BackgroundSecondary = Color(0xFF0A0A12)
+val SurfaceCard = Color(0xFF101019)
+val SurfaceCardElevated = Color(0xFF17172A)
+val SurfaceRaised = Color(0xFF1E1E2E)
+val SurfaceStroke = Color.White.copy(alpha = 0.07f)
+val SurfaceStrokeStrong = Color.White.copy(alpha = 0.14f)
 
-// A single restrained accent (Apple system blue territory) — used sparingly:
-// active states, progress, and the one or two things per screen that matter.
-val AccentPrimary = Color(0xFF0A84FF)
-val AccentSoft = AccentPrimary.copy(alpha = 0.16f)
-val AccentSuccess = Color(0xFF30D158)
-val AccentDanger = Color(0xFFFF453A)
-val AccentWarning = Color(0xFFFFD60A)
+// Aurora accent ramp.
+val AuroraIndigo = Color(0xFF6366F1)
+val AuroraViolet = Color(0xFFA855F7)
+val AuroraCyan = Color(0xFF22D3EE)
+val AuroraBlue = Color(0xFF3B82F6)
+val AuroraPink = Color(0xFFEC4899)
 
-// Play/pause button — a low-opacity neutral gray glass fill, deliberately
-// NOT a solid white disc, plus a soft accent glow used behind it and behind
-// the timebar thumb while actively dragging.
-val PlayButtonFill = Color(0xFF8E8E93).copy(alpha = 0.30f)
-val AccentGlow = AccentPrimary.copy(alpha = 0.45f)
+/** The one accent used for progress, active states, and focus. */
+val AccentPrimary = AuroraIndigo
+val AccentGlow = AuroraCyan
+val AccentSoft = AuroraIndigo.copy(alpha = 0.16f)
+val AccentSuccess = Color(0xFF34D399)
+val AccentDanger = Color(0xFFFB7185)
+val AccentWarning = Color(0xFFFBBF24)
 
-// Text — Apple system gray scale equivalents
-val TextPrimary = Color(0xFFF5F5F7)
-val TextSecondary = Color(0xFFAEAEB2)
-val TextTertiary = Color(0xFF6E6E73)
-val TextQuaternary = Color(0xFF48484A)
+// Ambient bleeds — very low alpha washes painted behind content to give the
+// near-black background its subtle colored glow.
+val BleedIndigo = AuroraIndigo.copy(alpha = 0.20f)
+val BleedViolet = AuroraViolet.copy(alpha = 0.16f)
+val BleedCyan = AuroraCyan.copy(alpha = 0.12f)
 
+// Glass — translucent fills meant to sit over blurred/darkened content.
+val GlassFill = Color.White.copy(alpha = 0.06f)
+val GlassFillLight = Color.White.copy(alpha = 0.10f)
+val GlassFillStrong = Color.White.copy(alpha = 0.14f)
+val GlassStroke = Color.White.copy(alpha = 0.12f)
+val GlassStrokeBright = Color.White.copy(alpha = 0.22f)
+
+// Hairlines.
+val HairlineLight = Color.White.copy(alpha = 0.06f)
+val HairlineMid = Color.White.copy(alpha = 0.12f)
+val HairlineStrong = Color.White.copy(alpha = 0.20f)
+
+// Scrims for video overlays.
+val ScrimSoft = Color.Black.copy(alpha = 0.30f)
+val ScrimMedium = Color.Black.copy(alpha = 0.50f)
+val ScrimStrong = Color.Black.copy(alpha = 0.72f)
 val Scrim = ScrimStrong
+
+/**
+ * The play/pause fill: a low-opacity gray circle behind a plain play glyph,
+ * rather than a heavy white disc.
+ */
+val ControlCircleFill = Color(0xFF8A8A99).copy(alpha = 0.22f)
+val ControlCircleStroke = Color.White.copy(alpha = 0.16f)
+
+// Text.
+val TextPrimary = Color(0xFFF8F8FC)
+val TextSecondary = Color(0xFFA9A9BC)
+val TextTertiary = Color(0xFF6C6C82)
+val TextQuaternary = Color(0xFF454557)

@@ -18,11 +18,13 @@ object Spacing {
     val xxxl = 40.dp
 }
 
-/** Consistent corner radii used across cards, sheets, and buttons. */
+/** Consistent corner radii. Generous by default — round, soft, modern. */
 object Radius {
-    val sm = 10.dp
-    val md = 14.dp
-    val lg = 18.dp
-    val xl = 24.dp
-    val pill = 100.dp
+    val xs = 8.dp
+    val sm = 12.dp
+    val md = 16.dp
+    val lg = 22.dp
+    val xl = 28.dp
+    val xxl = 36.dp
+    val pill = 999.dp
 }

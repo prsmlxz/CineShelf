@@ -1,51 +1,45 @@
 package com.cineshelf.app.ui.player
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cineshelf.app.ui.theme.*
 
-data class PopupOption(val key: String, val label: String)
+data class PopupOption(val key: String, val label: String, val trailing: String? = null)
 
 /**
- * A floating, bottom-anchored glass panel used for every "choose one"
- * control (speed, subtitles, audio, sleep timer). Slides up with a fade,
- * dismisses on scrim tap. `headerTrailing` lets a caller drop an extra
- * action next to the title — used by the Subtitles menu for its "Aa"
- * style-settings shortcut, so track selection and appearance live one tap
- * apart instead of being crammed into the same list.
+ * Bottom-anchored glass sheet used for every "choose one" control. Slides up
+ * on a spring with the scrim fading in behind it.
  */
 @Composable
 fun BoxScope.GlassPopupMenu(
@@ -53,8 +47,7 @@ fun BoxScope.GlassPopupMenu(
     options: List<PopupOption>,
     selectedKey: String?,
     onSelect: (String) -> Unit,
-    onDismiss: () -> Unit,
-    headerTrailing: (@Composable () -> Unit)? = null
+    onDismiss: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -66,36 +59,38 @@ fun BoxScope.GlassPopupMenu(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(Spacing.md)
-            .glassPanel(shape = RoundedCornerShape(Radius.xl))
+            .padding(Spacing.sm)
+            .glassPanel(
+                shape = RoundedCornerShape(Radius.xxl),
+                fill = SurfaceCardElevated.copy(alpha = 0.94f),
+                stroke = GlassStrokeBright
+            )
             .padding(vertical = Spacing.sm)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = TextSecondary,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
-            headerTrailing?.invoke()
-        }
-        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+        // Grabber
+        Box(
+            Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = Spacing.xs)
+                .size(width = 36.dp, height = 4.dp)
+                .background(HairlineStrong, RoundedCornerShape(Radius.pill))
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = TextTertiary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)
+        )
+        LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
             items(options, key = { it.key }) { option ->
                 val isSelected = option.key == selectedKey
-                val rowBackground by animateColorAsState(
-                    targetValue = if (isSelected) AccentSoft else Color.Transparent,
-                    label = "menu-row-bg"
-                )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.sm, vertical = 2.dp)
+                        .padding(horizontal = Spacing.xs, vertical = 2.dp)
                         .clip(RoundedCornerShape(Radius.md))
-                        .background(rowBackground)
+                        .background(if (isSelected) AccentSoft else Color.Transparent)
                         .premiumPressableNoScale(onClick = { onSelect(option.key) })
                         .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically
@@ -103,12 +98,32 @@ fun BoxScope.GlassPopupMenu(
                     Text(
                         option.label,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (isSelected) AccentPrimary else TextPrimary,
+                        color = if (isSelected) TextPrimary else TextSecondary,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         modifier = Modifier.weight(1f)
                     )
+                    option.trailing?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextTertiary,
+                            modifier = Modifier.padding(end = Spacing.xs)
+                        )
+                    }
                     if (isSelected) {
-                        Icon(Icons.Outlined.Check, contentDescription = null, tint = AccentPrimary, modifier = Modifier.size(18.dp))
+                        Box(
+                            Modifier
+                                .size(20.dp)
+                                .background(AccentPrimary, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -117,132 +132,145 @@ fun BoxScope.GlassPopupMenu(
     }
 }
 
-/** A minimal clickable surface with no press-scale — used inside menus/lists where scale feels wrong. */
-@Composable
-fun Modifier.premiumPressableNoScale(onClick: () -> Unit): Modifier {
-    val interactionSource = remember { MutableInteractionSource() }
-    return this.clickable(
-        interactionSource = interactionSource,
-        indication = null,
-        onClick = onClick
-    )
-}
-
-/**
- * The central play/pause control. Replaces the old solid-white disc with a
- * low-opacity glass surface plus a soft accent halo, so it reads as "an
- * icon with a subtle backing" rather than a sticker pasted on the video.
- */
-@Composable
-fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.90f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh),
-        label = "play-button-scale"
-    )
-
-    Box(modifier = modifier.size(76.dp), contentAlignment = Alignment.Center) {
-        // Soft ambient halo behind the button — a gradient falloff, not a hard ring.
-        Box(
-            Modifier
-                .size(76.dp)
-                .background(Brush.radialGradient(listOf(AccentGlow, Color.Transparent)), CircleShape)
-        )
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(CircleShape)
-                .background(PlayButtonFill)
-                .border(1.dp, HairlineMid, CircleShape)
-                .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Crossfade(targetState = isPlaying, animationSpec = tween(160), label = "play-icon") { playing ->
-                Icon(
-                    if (playing) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
-                    tint = Color.White,
-                    // The play triangle's glyph isn't optically centered in its bounds; nudge it right.
-                    modifier = Modifier
-                        .size(30.dp)
-                        .padding(start = if (!playing) 2.dp else 0.dp)
-                )
-            }
-        }
-    }
-}
-
-/** Small pill HUD shown briefly while adjusting brightness or volume via vertical swipe. */
+/** Brightness/volume HUD shown during a vertical swipe. */
 @Composable
 fun BoxScope.LevelHud(icon: ImageVector, level: Float, label: String) {
+    val animated by animateFloatAsState(
+        targetValue = level.coerceIn(0f, 1f),
+        animationSpec = Motion.standard(),
+        label = "hud-level"
+    )
     Column(
         modifier = Modifier
             .align(Alignment.Center)
-            .glassPanel(shape = RoundedCornerShape(Radius.lg))
+            .glassPanel(
+                shape = RoundedCornerShape(Radius.lg),
+                fill = ScrimStrong,
+                stroke = GlassStroke
+            )
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(Spacing.xs))
+        Spacer(Modifier.height(Spacing.sm))
         Box(
             Modifier
-                .width(88.dp)
-                .height(3.dp)
-                .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(Radius.pill))
+                .width(90.dp)
+                .height(5.dp)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(Color.White.copy(alpha = 0.20f))
         ) {
             Box(
                 Modifier
                     .fillMaxHeight()
-                    .fillMaxWidth(level.coerceIn(0f, 1f))
-                    .background(AccentPrimary, RoundedCornerShape(Radius.pill))
+                    .fillMaxWidth(animated)
+                    .background(
+                        Brush.horizontalGradient(listOf(AccentPrimary, AccentGlow)),
+                        RoundedCornerShape(Radius.pill)
+                    )
             )
         }
-        Spacer(Modifier.height(Spacing.xxs))
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f))
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.9f),
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
-/** Large centered time-delta HUD shown while horizontally swipe-scrubbing, with a real preview frame when available. */
+/**
+ * The preview card shown while scrubbing: a real decoded frame with the target
+ * timestamp and delta beneath it.
+ */
 @Composable
-fun BoxScope.ScrubHud(targetTimeLabel: String, deltaLabel: String, thumbnailPath: String? = null) {
+fun ScrubPreviewCard(
+    frame: ImageBitmap?,
+    timeLabel: String,
+    deltaLabel: String,
+    modifier: Modifier = Modifier
+) {
     Column(
-        modifier = Modifier
-            .align(Alignment.Center)
-            .glassPanel(shape = RoundedCornerShape(Radius.lg))
-            .padding(Spacing.sm),
+        modifier = modifier
+            .glassPanel(
+                shape = RoundedCornerShape(Radius.md),
+                fill = ScrimStrong,
+                stroke = GlassStrokeBright
+            )
+            .padding(Spacing.xxs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (thumbnailPath != null) {
-            coil.compose.AsyncImage(
-                model = java.io.File(thumbnailPath),
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier
-                    .width(160.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(Radius.sm))
-            )
-            Spacer(Modifier.height(Spacing.xs))
+        Box(
+            Modifier
+                .width(168.dp)
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(Radius.sm))
+                .background(Color.Black)
+        ) {
+            if (frame != null) {
+                Image(
+                    bitmap = frame,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
-        Text(targetTimeLabel, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(Spacing.xxs))
+        Text(
+            timeLabel,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            deltaLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = AccentGlow
+        )
         Spacer(Modifier.height(2.dp))
-        Text(deltaLabel, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
     }
 }
 
-/** Small pill feedback for double-tap seek, e.g. "-10s" / "+10s". */
+/** Feedback pill for double-tap seek. */
 @Composable
 fun BoxScope.SeekBubble(text: String, isLeft: Boolean) {
-    Box(
+    Column(
         modifier = Modifier
             .align(if (isLeft) Alignment.CenterStart else Alignment.CenterEnd)
-            .padding(horizontal = Spacing.xxl)
-            .glassPanel(shape = CircleShape)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .padding(horizontal = Spacing.xl)
+            .auroraGlow(color = AccentPrimary, radius = 20.dp, glowAlpha = 0.35f)
+            .glassPanel(shape = CircleShape, fill = ScrimStrong, stroke = GlassStrokeBright)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text, color = Color.White, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium
+        )
+    }
+}
+
+/** Badge shown while long-press speed boost is held. */
+@Composable
+fun BoxScope.SpeedBoostBadge(label: String) {
+    Row(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = 72.dp)
+            .auroraGlow(color = AuroraViolet, radius = 18.dp, glowAlpha = 0.4f)
+            .glassPanel(shape = CircleShape, fill = ScrimStrong, stroke = GlassStrokeBright)
+            .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall
+        )
     }
 }
