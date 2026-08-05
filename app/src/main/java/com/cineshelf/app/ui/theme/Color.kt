@@ -3,72 +3,79 @@ package com.cineshelf.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // ---------------------------------------------------------------------------
-// Aurora Glass — a deep-space palette.
+// Monochrome base, single purple accent.
 //
-// Surfaces are near-black but never pure #000: each layer carries a faint blue
-// bias so stacked panels read as depth rather than as flat cutouts. Accents are
-// drawn from an indigo -> cyan -> violet aurora ramp used for glows and active
-// states, deliberately kept off the surfaces themselves so video content stays
-// the brightest thing on screen.
+// The interface is black and neutral gray. Colour appears only where it carries
+// meaning: playback progress, the active item in a list, a focus ring. Anything
+// decorative is white-at-low-alpha instead, so the video itself is always the
+// most saturated thing on screen.
+//
+// Surfaces are true neutral (equal R/G/B) — a blue bias in the grays is what
+// made the previous palette read as "purple everywhere" even where no accent
+// was drawn.
 // ---------------------------------------------------------------------------
 
-// Base surfaces — cool near-blacks, layered light-to-dark for elevation.
-val BackgroundPrimary = Color(0xFF06060A)
-val BackgroundSecondary = Color(0xFF0A0A12)
-val SurfaceCard = Color(0xFF101019)
-val SurfaceCardElevated = Color(0xFF17172A)
-val SurfaceRaised = Color(0xFF1E1E2E)
+// Base surfaces, layered dark-to-light for elevation.
+val BackgroundPrimary = Color(0xFF000000)
+val BackgroundSecondary = Color(0xFF070708)
+val SurfaceSunken = Color(0xFF0B0B0C)
+val SurfaceCard = Color(0xFF121213)
+val SurfaceCardElevated = Color(0xFF1A1A1C)
+val SurfaceRaised = Color(0xFF232326)
 val SurfaceStroke = Color.White.copy(alpha = 0.07f)
 val SurfaceStrokeStrong = Color.White.copy(alpha = 0.14f)
 
-// Aurora accent ramp.
-val AuroraIndigo = Color(0xFF6366F1)
-val AuroraViolet = Color(0xFFA855F7)
-val AuroraCyan = Color(0xFF22D3EE)
-val AuroraBlue = Color(0xFF3B82F6)
-val AuroraPink = Color(0xFFEC4899)
+// The accent. One hue, three intensities — nothing else in the app is coloured.
+val AccentPrimary = Color(0xFF9E7BFF)
+val AccentBright = Color(0xFFB79AFF)
+val AccentDeep = Color(0xFF7C5CE0)
+val AccentGlow = AccentBright
+val AccentSoft = AccentPrimary.copy(alpha = 0.14f)
+val AccentFaint = AccentPrimary.copy(alpha = 0.07f)
 
-/** The one accent used for progress, active states, and focus. */
-val AccentPrimary = AuroraIndigo
-val AccentGlow = AuroraCyan
-val AccentSoft = AuroraIndigo.copy(alpha = 0.16f)
-val AccentSuccess = Color(0xFF34D399)
-val AccentDanger = Color(0xFFFB7185)
+// Retained aliases so accent references resolve to the single hue rather than
+// reintroducing a second colour family.
+val AuroraIndigo = AccentPrimary
+val AuroraViolet = AccentBright
+val AuroraCyan = AccentBright
+val AuroraBlue = AccentDeep
+val AuroraPink = AccentBright
+
+// Status colours. Desaturated on purpose: they annotate, they don't decorate.
+val AccentSuccess = Color(0xFF4ADE80)
+val AccentDanger = Color(0xFFF87171)
 val AccentWarning = Color(0xFFFBBF24)
 
-// Ambient bleeds — very low alpha washes painted behind content to give the
-// near-black background its subtle colored glow.
-val BleedIndigo = AuroraIndigo.copy(alpha = 0.20f)
-val BleedViolet = AuroraViolet.copy(alpha = 0.16f)
-val BleedCyan = AuroraCyan.copy(alpha = 0.12f)
+// Ambient bleeds. Near-neutral lifts that keep the black from reading as a flat
+// void, plus one barely-there accent tint.
+val BleedNeutral = Color.White.copy(alpha = 0.045f)
+val BleedNeutralSoft = Color.White.copy(alpha = 0.025f)
+val BleedAccent = AccentPrimary.copy(alpha = 0.055f)
 
 // Glass — translucent fills meant to sit over blurred/darkened content.
-val GlassFill = Color.White.copy(alpha = 0.06f)
-val GlassFillLight = Color.White.copy(alpha = 0.10f)
-val GlassFillStrong = Color.White.copy(alpha = 0.14f)
-val GlassStroke = Color.White.copy(alpha = 0.12f)
-val GlassStrokeBright = Color.White.copy(alpha = 0.22f)
+val GlassFill = Color.White.copy(alpha = 0.055f)
+val GlassFillLight = Color.White.copy(alpha = 0.09f)
+val GlassFillStrong = Color.White.copy(alpha = 0.13f)
+val GlassStroke = Color.White.copy(alpha = 0.10f)
+val GlassStrokeBright = Color.White.copy(alpha = 0.20f)
 
 // Hairlines.
 val HairlineLight = Color.White.copy(alpha = 0.06f)
-val HairlineMid = Color.White.copy(alpha = 0.12f)
-val HairlineStrong = Color.White.copy(alpha = 0.20f)
+val HairlineMid = Color.White.copy(alpha = 0.11f)
+val HairlineStrong = Color.White.copy(alpha = 0.18f)
 
 // Scrims for video overlays.
-val ScrimSoft = Color.Black.copy(alpha = 0.30f)
-val ScrimMedium = Color.Black.copy(alpha = 0.50f)
-val ScrimStrong = Color.Black.copy(alpha = 0.72f)
+val ScrimSoft = Color.Black.copy(alpha = 0.28f)
+val ScrimMedium = Color.Black.copy(alpha = 0.45f)
+val ScrimStrong = Color.Black.copy(alpha = 0.70f)
 val Scrim = ScrimStrong
 
-/**
- * The play/pause fill: a low-opacity gray circle behind a plain play glyph,
- * rather than a heavy white disc.
- */
-val ControlCircleFill = Color(0xFF8A8A99).copy(alpha = 0.22f)
-val ControlCircleStroke = Color.White.copy(alpha = 0.16f)
+/** Fill behind the transport glyphs: neutral gray, never tinted. */
+val ControlCircleFill = Color.White.copy(alpha = 0.11f)
+val ControlCircleStroke = Color.White.copy(alpha = 0.14f)
 
 // Text.
-val TextPrimary = Color(0xFFF8F8FC)
-val TextSecondary = Color(0xFFA9A9BC)
-val TextTertiary = Color(0xFF6C6C82)
-val TextQuaternary = Color(0xFF454557)
+val TextPrimary = Color(0xFFF5F5F7)
+val TextSecondary = Color(0xFF9C9CA3)
+val TextTertiary = Color(0xFF6A6A70)
+val TextQuaternary = Color(0xFF43434A)

@@ -51,14 +51,15 @@ object PipActions {
     fun buildParams(
         context: Context,
         isPlaying: Boolean,
-        videoSize: VideoSize?
+        videoSize: VideoSize?,
+        skipSeconds: Int = 10
     ): PictureInPictureParams {
         val ratio = aspectRatio(videoSize)
         val actions = listOf(
             remoteAction(
                 context,
                 android.R.drawable.ic_media_rew,
-                "Rewind 10 seconds",
+                "Rewind $skipSeconds seconds",
                 CONTROL_REWIND
             ),
             remoteAction(
@@ -70,7 +71,7 @@ object PipActions {
             remoteAction(
                 context,
                 android.R.drawable.ic_media_ff,
-                "Forward 10 seconds",
+                "Forward $skipSeconds seconds",
                 CONTROL_FORWARD
             )
         )

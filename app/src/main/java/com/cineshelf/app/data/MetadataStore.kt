@@ -1,6 +1,7 @@
 package com.cineshelf.app.data
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.locks.ReentrantLock
@@ -76,6 +77,68 @@ class MetadataStore(context: Context) {
 
     fun remove(path: String) = lock.withLock {
         cache.remove(path)
+        persist()
+    }
+
+    /**
+     * Reads cached container facts, or null on a miss.
+     *
+     * Stamped with the file's lastModified so a replaced file (same path, new
+     * encode) doesn't keep reporting the old encode's resolution and codec.
+     */
+    fun getMediaInfo(path: String, lastModified: Long): MediaInfo? = lock.withLock {
+        val entry = cache.optJSONObject(path)?.optJSONObject("media") ?: return null
+        if (entry.optLong("stamp", -1L) != lastModified) return null
+        val tracks = entry.optJSONArray("audio")
+        MediaInfo(
+            durationMs = entry.optLong("durationMs", 0L),
+            width = entry.optInt("width", 0),
+            height = entry.optInt("height", 0),
+            videoCodec = entry.optString("videoCodec").takeIf { it.isNotEmpty() },
+            hdrFormat = entry.optString("hdrFormat").takeIf { it.isNotEmpty() },
+            audioTracks = (0 until (tracks?.length() ?: 0)).mapNotNull { i ->
+                tracks?.optJSONObject(i)?.let {
+                    AudioTrackInfo(
+                        language = it.optString("lang").takeIf { s -> s.isNotEmpty() },
+                        codec = it.optString("codec"),
+                        channelCount = it.optInt("ch", 0)
+                    )
+                }
+            },
+            subtitleTrackCount = entry.optInt("subs", 0),
+            fileSizeBytes = entry.optLong("size", 0L)
+        )
+    }
+
+    fun putMediaInfo(path: String, lastModified: Long, info: MediaInfo) = lock.withLock {
+        val entry = cache.optJSONObject(path) ?: JSONObject().also { cache.put(path, it) }
+        entry.put(
+            "media",
+            JSONObject().apply {
+                put("stamp", lastModified)
+                put("durationMs", info.durationMs)
+                put("width", info.width)
+                put("height", info.height)
+                put("videoCodec", info.videoCodec ?: "")
+                put("hdrFormat", info.hdrFormat ?: "")
+                put("subs", info.subtitleTrackCount)
+                put("size", info.fileSizeBytes)
+                put(
+                    "audio",
+                    JSONArray().apply {
+                        info.audioTracks.forEach { track ->
+                            put(
+                                JSONObject().apply {
+                                    put("lang", track.language ?: "")
+                                    put("codec", track.codec)
+                                    put("ch", track.channelCount)
+                                }
+                            )
+                        }
+                    }
+                )
+            }
+        )
         persist()
     }
 

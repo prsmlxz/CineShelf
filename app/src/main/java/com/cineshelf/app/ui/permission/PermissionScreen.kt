@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -98,18 +101,15 @@ fun PermissionScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)
-                    .auroraGlow(AccentPrimary, radius = 20.dp, glowAlpha = 0.45f, cornerRadius = 27.dp)
+                    .auroraGlow(AccentPrimary, radius = 18.dp, glowAlpha = 0.28f, cornerRadius = Radius.pill)
                     .premiumPressable(scaleDown = 0.97f) {
                         val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                             data = Uri.parse("package:${context.packageName}")
                         }
                         context.startActivity(intent)
                     }
-                    .glassPanel(
-                        shape = RoundedCornerShape(Radius.pill),
-                        fill = AccentPrimary,
-                        stroke = GlassStrokeBright
-                    ),
+                    .clip(RoundedCornerShape(Radius.pill))
+                    .background(Brush.horizontalGradient(listOf(AccentDeep, AccentPrimary))),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

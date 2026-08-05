@@ -85,11 +85,23 @@ fun MediaTile(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
+                    // Episode number set large and very dim, so a thumbnail-less
+                    // rail still has something to distinguish one tile from the
+                    // next instead of reading as identical empty rectangles.
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(SurfaceCardElevated, SurfaceCard)))
-                    )
+                            .background(Brush.linearGradient(listOf(SurfaceCardElevated, SurfaceSunken))),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            item.episodeNumber?.toString()
+                                ?: item.displayTitle.trim().take(1).uppercase(),
+                            style = MaterialTheme.typography.displayLarge,
+                            color = Color.White.copy(alpha = 0.08f),
+                            modifier = Modifier.padding(start = Spacing.md)
+                        )
+                    }
                 }
                 Box(
                     Modifier
@@ -111,7 +123,7 @@ fun MediaTile(
                     )
             )
 
-            if (item.durationMs > 0) {
+            if (item.effectiveDurationMs > 0) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -124,7 +136,7 @@ fun MediaTile(
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        formatDuration(item.durationMs),
+                        formatDuration(item.effectiveDurationMs),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.88f),
                         fontWeight = FontWeight.SemiBold
@@ -133,18 +145,25 @@ fun MediaTile(
             }
 
             if (item.watched) {
+                // Glass and white, not green. A saturated status dot on every
+                // finished tile was the loudest colour on the page, competing
+                // with the accent for attention it doesn't deserve.
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .size(21.dp)
-                        .glassPanel(shape = CircleShape, fill = AccentSuccess.copy(alpha = 0.92f)),
+                        .glassPanel(
+                            shape = CircleShape,
+                            fill = Color.Black.copy(alpha = 0.55f),
+                            stroke = GlassStrokeBright
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Outlined.Check,
                         contentDescription = "Watched",
-                        tint = Color(0xFF04160E),
+                        tint = Color.White.copy(alpha = 0.9f),
                         modifier = Modifier.size(12.dp)
                     )
                 }
@@ -236,14 +255,29 @@ fun MediaTile(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
-        Text(
-            item.file.name,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextTertiary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        // The filename used to sit here, which is noise — it's the thing the
+        // title was derived from. Show what the file *is* instead.
+        subtitleLine(item)?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.labelSmall,
+                color = TextTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
+}
+
+/** "S01E04 · 1080p · HEVC", dropping whatever isn't known. */
+private fun subtitleLine(item: VideoItem): String? {
+    val parts = mutableListOf<String>()
+    if (item.seasonNumber != null && item.episodeNumber != null) {
+        parts += "S%02dE%02d".format(item.seasonNumber, item.episodeNumber)
+    }
+    item.mediaInfo?.resolutionLabel?.let { parts += it }
+    item.mediaInfo?.videoCodec?.let { parts += it }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
 @Composable

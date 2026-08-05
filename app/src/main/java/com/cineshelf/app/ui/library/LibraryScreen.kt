@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -279,11 +280,7 @@ private fun ContinueWatchingCard(entry: ContinueWatchingEntry, onClick: () -> Un
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Brush.linearGradient(listOf(SurfaceCard, SurfaceRaised)))
-            )
+            PosterMonogram(entry.show.name, compact = true)
         }
         Box(
             Modifier
@@ -380,19 +377,7 @@ private fun ShowTile(show: ShowItem, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Brush.linearGradient(listOf(SurfaceCardElevated, SurfaceCard))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.Movie,
-                        contentDescription = null,
-                        tint = TextQuaternary,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
+                PosterMonogram(show.name)
             }
 
             Box(
@@ -414,7 +399,27 @@ private fun ShowTile(show: ShowItem, onClick: () -> Unit) {
                     )
             )
 
-            if (show.totalItemCount > 0) {
+            if (show.seasons.isNotEmpty()) {
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(Spacing.xs)
+                        .glassPanel(
+                            shape = RoundedCornerShape(Radius.xs),
+                            fill = Color.Black.copy(alpha = 0.5f),
+                            stroke = HairlineLight
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        "${show.seasons.size}S",
+                        style = BadgeLabel,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
+
+            if (show.totalItemCount > 0 && show.watchedCount > 0) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(Spacing.xs)) {
                     ProgressRail(show.watchedCount.toFloat() / show.totalItemCount.toFloat())
                 }
@@ -431,13 +436,63 @@ private fun ShowTile(show: ShowItem, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            if (show.totalItemCount == 0) "Empty"
-            else "${show.totalItemCount} item${if (show.totalItemCount == 1) "" else "s"}",
+            shelfSubtitle(show),
             style = MaterialTheme.typography.labelSmall,
             color = TextTertiary,
             modifier = Modifier.padding(top = 1.dp)
         )
     }
+}
+
+/**
+ * Stand-in for missing poster art: the show's initial, set very large and very
+ * dim over a soft gradient.
+ *
+ * A small centred "no image" glyph is what made these cards read as broken —
+ * it looks like a failed load. A monogram at poster scale reads as a designed
+ * cover, and because it differs per show the shelf stops looking like a grid of
+ * identical empty rectangles.
+ */
+@Composable
+private fun PosterMonogram(name: String, compact: Boolean = false) {
+    val initial = name.trim().firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(listOf(SurfaceCardElevated, SurfaceSunken))
+            ),
+        // Landscape cards carry a centred play button, so the letter moves to the
+        // leading edge rather than sitting directly behind it.
+        contentAlignment = if (compact) Alignment.CenterStart else Alignment.Center
+    ) {
+        // A single faint accent bloom keeps the tile from being pure gray without
+        // tinting the whole card.
+        Box(Modifier.fillMaxSize().auroraGlow(AccentPrimary, radius = 0.dp, glowAlpha = 0.07f))
+        Text(
+            initial,
+            style = MaterialTheme.typography.displayLarge,
+            fontSize = if (compact) 40.sp else 72.sp,
+            color = Color.White.copy(alpha = 0.09f),
+            modifier = if (compact) Modifier.padding(start = Spacing.md) else Modifier
+        )
+        if (!compact) {
+            Icon(
+                Icons.Outlined.Movie,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.13f),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xs).size(16.dp)
+            )
+        }
+    }
+}
+
+private fun shelfSubtitle(show: ShowItem): String = when {
+    show.totalItemCount == 0 -> "No videos yet"
+    show.watchedCount == show.totalItemCount -> "Watched"
+    show.watchedCount > 0 -> "${show.watchedCount} of ${show.totalItemCount} watched"
+    show.totalItemCount == 1 -> "1 item"
+    else -> "${show.totalItemCount} items"
 }
 
 @Composable
@@ -479,9 +534,10 @@ private fun EmptyLibrary(onAdd: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(Spacing.xl))
         Row(
             modifier = Modifier
-                .auroraGlow(AccentPrimary, radius = 18.dp, glowAlpha = 0.45f)
-                .premiumPressable(onClick = onAdd)
-                .glassPanel(shape = RoundedCornerShape(Radius.pill), fill = AccentPrimary)
+                .auroraGlow(AccentPrimary, radius = 18.dp, glowAlpha = 0.28f, cornerRadius = Radius.pill)
+                .premiumPressable(scaleDown = 0.97f, onClick = onAdd)
+                .clip(RoundedCornerShape(Radius.pill))
+                .background(Brush.horizontalGradient(listOf(AccentDeep, AccentPrimary)))
                 .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {

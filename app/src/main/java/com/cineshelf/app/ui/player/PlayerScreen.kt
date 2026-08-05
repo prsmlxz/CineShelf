@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -25,24 +24,20 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBackIosNew
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.outlined.AspectRatio
-import androidx.compose.material.icons.outlined.Audiotrack
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.BrightnessMedium
 import androidx.compose.material.icons.outlined.ClosedCaption
-import androidx.compose.material.icons.outlined.Forward10
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
-import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Replay10
-import androidx.compose.material.icons.outlined.ScreenRotation
-import androidx.compose.material.icons.outlined.SkipNext
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Subtitles
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.rounded.KeyboardDoubleArrowRight
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,11 +54,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -80,13 +73,16 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.cineshelf.app.ImmersiveModeController
 import com.cineshelf.app.PipModeController
 import com.cineshelf.app.data.FramePreviewSource
-import com.cineshelf.app.data.SubtitlePrefs
+import com.cineshelf.app.data.PlayerPrefsStore
 import com.cineshelf.app.data.SubtitlePrefsStore
 import com.cineshelf.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -95,10 +91,13 @@ import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 
-private enum class ActiveMenu { NONE, SPEED, SUBTITLE_TRACK, AUDIO, SLEEP_TIMER, SUBTITLE_STYLE }
+private enum class ActiveMenu { NONE, SUBTITLES, AUDIO, SLEEP_TIMER, PLAYBACK }
 private enum class HudType { BRIGHTNESS, VOLUME }
 
 private const val BOOST_SPEED = 2f
+
+/** How close a decoded preview frame must be to the finger to be worth showing. */
+private const val PREVIEW_MATCH_WINDOW_MS = 6_000L
 
 @Composable
 fun PlayerScreen(
@@ -116,23 +115,47 @@ fun PlayerScreen(
     val file = remember(filePath) { File(filePath) }
     val isInPip by PipModeController.isInPip
 
-    // ExoPlayer's default LoadControl is tuned for network streaming — it withholds
-    // playback until multiple seconds are buffered, which makes local file playback
-    // feel like it's loading over the internet. These thresholds are milliseconds.
+    // ExoPlayer's defaults are tuned for network streaming: it withholds playback
+    // until several seconds are buffered, which makes a local file feel like it's
+    // loading over the internet. 200ms of decoded video is plenty to start from
+    // storage, and prioritising time over size stops a high-bitrate HEVC file
+    // from tripping the byte-count ceiling before it reaches that threshold —
+    // which is what made x265 files specifically slow to start.
     val loadControl = remember {
         DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1_000, 20_000, 150, 300)
+            .setBufferDurationsMs(1_000, 20_000, 200, 400)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
+    }
+
+    // Decoder fallback matters for HEVC above all: many devices advertise a
+    // hardware HEVC decoder that then refuses a particular profile/level, and
+    // without fallback that's a hard playback error instead of a quiet switch to
+    // the software decoder. Constant-bitrate seeking gives files with no seek
+    // table (common in remuxes) usable scrubbing.
+    val renderersFactory = remember {
+        DefaultRenderersFactory(context)
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+    }
+    val mediaSourceFactory = remember {
+        DefaultMediaSourceFactory(
+            context,
+            DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true)
+        )
     }
 
     val subtitleFiles = remember(filePath) { viewModel.findSubtitleFiles(file) }
     val nextEpisode = remember(filePath) { viewModel.findNextEpisode(file) }
 
+    val playerPrefsStore = remember { PlayerPrefsStore(context) }
+    var playerPrefs by remember { mutableStateOf(playerPrefsStore.load()) }
+
     val exoPlayer = remember {
         ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
-            .setSeekBackIncrementMs(10_000)
-            .setSeekForwardIncrementMs(10_000)
+            .setRenderersFactory(renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .build()
             .apply {
                 val mediaItem = MediaItem.Builder()
@@ -175,7 +198,8 @@ fun PlayerScreen(
     var sleepTimerEndAt by remember { mutableStateOf<Long?>(null) }
     var sleepTimerLabel by remember { mutableStateOf("Off") }
 
-    var seekBubble by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    var seekRipple by remember { mutableStateOf<SeekRipple?>(null) }
+    var rippleToken by remember { mutableIntStateOf(0) }
     var hud by remember { mutableStateOf<HudType?>(null) }
     var brightnessLevel by remember { mutableFloatStateOf(0.6f) }
     var volumeLevel by remember { mutableFloatStateOf(0.5f) }
@@ -195,25 +219,35 @@ fun PlayerScreen(
     var subtitlePrefs by remember { mutableStateOf(prefsStore.load()) }
     var subtitleOffsetMs by remember { mutableLongStateOf(0L) }
 
-    var resumePromptMs by remember { mutableStateOf<Long?>(null) }
+    var autoResumedAtMs by remember { mutableStateOf<Long?>(null) }
     var nextEpisodeCountdown by remember { mutableStateOf<Int?>(null) }
 
     val frameSource = remember(filePath) { FramePreviewSource(file, scope) }
 
-    // --- Resume prompt: offer rather than silently jump ---
+    // Resume silently. Asking meant every episode opened with a decision to make;
+    // the toast is confirmation after the fact, not a prompt.
     LaunchedEffect(Unit) {
         val saved = viewModel.getInitialPosition(file)
-        if (saved > 10_000L) resumePromptMs = saved
+        if (saved > 10_000L) {
+            exoPlayer.seekTo(saved)
+            currentPositionMs = saved
+            autoResumedAtMs = saved
+        }
     }
-    LaunchedEffect(resumePromptMs) {
-        if (resumePromptMs != null) {
-            delay(7_000)
-            resumePromptMs = null
+    LaunchedEffect(autoResumedAtMs) {
+        if (autoResumedAtMs != null) {
+            delay(2_600)
+            autoResumedAtMs = null
         }
     }
 
     DisposableEffect(frameSource) {
-        frameSource.start { _, image -> scrubFrame = image }
+        // Only accept a frame that's still near the finger. Async decodes finish
+        // out of order, so an unfiltered callback lets a stale frame overwrite
+        // the current one and the preview appears to stick.
+        frameSource.start { positionMs, image ->
+            if (abs(positionMs - scrubTargetMs) <= PREVIEW_MATCH_WINDOW_MS) scrubFrame = image
+        }
         onDispose { frameSource.release() }
     }
     LaunchedEffect(durationMs) {
@@ -289,7 +323,12 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(seekBubble) { if (seekBubble != null) { delay(650); seekBubble = null } }
+    LaunchedEffect(rippleToken) {
+        if (seekRipple != null) {
+            delay(700)
+            seekRipple = null
+        }
+    }
     LaunchedEffect(hud) { if (hud != null) { delay(900); hud = null } }
     LaunchedEffect(lockHintVisible) { if (lockHintVisible) { delay(1800); lockHintVisible = false } }
 
@@ -317,21 +356,28 @@ fun PlayerScreen(
     }
 
     // --- PiP: publish params so the Activity can auto-enter with real buttons ---
-    LaunchedEffect(isPlaying, videoSize) {
-        PipModeController.paramsProvider = { PipActions.buildParams(context, isPlaying, videoSize) }
+    LaunchedEffect(isPlaying, videoSize, playerPrefs.skipSeconds) {
+        val skipSeconds = playerPrefs.skipSeconds
+        PipModeController.paramsProvider = {
+            PipActions.buildParams(context, isPlaying, videoSize, skipSeconds)
+        }
         if (PipModeController.isInPip.value) {
             runCatching {
-                activity?.setPictureInPictureParams(PipActions.buildParams(context, isPlaying, videoSize))
+                activity?.setPictureInPictureParams(
+                    PipActions.buildParams(context, isPlaying, videoSize, skipSeconds)
+                )
             }
         }
     }
-    DisposableEffect(Unit) {
+    DisposableEffect(playerPrefs.skipMs) {
+        val skip = playerPrefs.skipMs
         val unregister = PipActions.registerReceiver(context) { control ->
             when (control) {
                 PipActions.CONTROL_PLAY_PAUSE ->
                     if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                PipActions.CONTROL_REWIND -> exoPlayer.seekTo((exoPlayer.currentPosition - 10_000L).coerceAtLeast(0))
-                PipActions.CONTROL_FORWARD -> exoPlayer.seekTo(exoPlayer.currentPosition + 10_000L)
+                PipActions.CONTROL_REWIND ->
+                    exoPlayer.seekTo((exoPlayer.currentPosition - skip).coerceAtLeast(0))
+                PipActions.CONTROL_FORWARD -> exoPlayer.seekTo(exoPlayer.currentPosition + skip)
             }
         }
         onDispose { unregister() }
@@ -354,11 +400,13 @@ fun PlayerScreen(
 
     fun haptic() = view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
 
-    fun seekRelative(deltaMs: Long, isLeft: Boolean) {
-        val target = (exoPlayer.currentPosition + deltaMs).coerceIn(0, durationMs.coerceAtLeast(0))
+    fun seekRelative(forward: Boolean) {
+        val delta = if (forward) playerPrefs.skipMs else -playerPrefs.skipMs
+        val target = (exoPlayer.currentPosition + delta).coerceIn(0, durationMs.coerceAtLeast(0))
         exoPlayer.seekTo(target)
         currentPositionMs = target
-        seekBubble = (if (deltaMs > 0) "+10s" else "-10s") to isLeft
+        rippleToken += 1
+        seekRipple = SeekRipple(playerPrefs.skipSeconds, isLeft = !forward, token = rippleToken)
         haptic()
     }
 
@@ -369,25 +417,27 @@ fun PlayerScreen(
         haptic()
     }
 
-    fun cycleAspect() {
-        aspectMode = aspectMode.next()
-        videoScale = 1f; videoOffsetX = 0f; videoOffsetY = 0f
-        controlsVisible = true
-    }
-
-    fun cycleOrientation() {
-        orientationMode = orientationMode.next()
-        activity?.requestedOrientation = when (orientationMode) {
+    fun applyOrientation(mode: OrientationMode) {
+        orientationMode = mode
+        activity?.requestedOrientation = when (mode) {
             OrientationMode.AUTO -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
             OrientationMode.LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             OrientationMode.PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
-        controlsVisible = true
+    }
+
+    fun applyAspect(mode: AspectMode) {
+        aspectMode = mode
+        videoScale = 1f; videoOffsetX = 0f; videoOffsetY = 0f
     }
 
     fun enterPip() {
         val act = activity ?: return
-        runCatching { act.enterPictureInPictureMode(PipActions.buildParams(context, isPlaying, videoSize)) }
+        runCatching {
+            act.enterPictureInPictureMode(
+                PipActions.buildParams(context, isPlaying, videoSize, playerPrefs.skipSeconds)
+            )
+        }
     }
 
     fun selectSubtitle(key: String) {
@@ -460,7 +510,7 @@ fun PlayerScreen(
                     sv.setFractionalTextSize(
                         androidx.media3.ui.SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * subtitlePrefs.scale
                     )
-                    val bottomDp = if (controlsVisible && !locked) 108 else 32
+                    val bottomDp = if (controlsVisible && !locked) 116 else 32
                     val bottomPx = with(density) {
                         (bottomDp * subtitlePrefs.bottomPaddingScale).dp.roundToPx()
                     }
@@ -485,7 +535,7 @@ fun PlayerScreen(
         if (isBuffering) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
-                    color = AccentGlow,
+                    color = AccentPrimary,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(34.dp)
                 )
@@ -540,7 +590,7 @@ fun PlayerScreen(
                             } while (event.changes.any { it.pressed })
                         }
                     }
-                    .pointerInput(durationMs) {
+                    .pointerInput(durationMs, playerPrefs) {
                         detectTapGestures(
                             // Holding runs at 2x; tryAwaitRelease is what gives the
                             // long-press a matching "released" edge to restore from.
@@ -559,9 +609,10 @@ fun PlayerScreen(
                             onDoubleTap = { offset ->
                                 val third = size.width / 3f
                                 when {
-                                    offset.x < third -> seekRelative(-10_000L, true)
-                                    offset.x > size.width - third -> seekRelative(10_000L, false)
-                                    else -> if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                    offset.x < third -> seekRelative(forward = false)
+                                    offset.x > size.width - third -> seekRelative(forward = true)
+                                    playerPrefs.centerTapTogglesPlayback ->
+                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
                                 }
                             }
                         )
@@ -618,16 +669,7 @@ fun PlayerScreen(
             )
         }
 
-        seekBubble?.let { (text, isLeft) ->
-            AnimatedVisibility(
-                visible = true,
-                enter = fadeIn(Motion.fade(120)) + scaleIn(Motion.bouncy(), initialScale = 0.8f),
-                exit = fadeOut(Motion.fade(150)),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Box(Modifier.fillMaxSize()) { SeekBubble(text = text, isLeft = isLeft) }
-            }
-        }
+        seekRipple?.let { SeekRippleOverlay(it) }
 
         hud?.let {
             when (it) {
@@ -644,7 +686,9 @@ fun PlayerScreen(
             }
         }
 
-        if (speedBoosted) SpeedBoostBadge("${BOOST_SPEED.toInt()}x speed")
+        if (speedBoosted) SpeedBoostBadge("${BOOST_SPEED.toInt()}× speed")
+
+        autoResumedAtMs?.let { AutoResumeToast(formatTime(it)) }
 
         if (locked) {
             AnimatedVisibility(
@@ -656,9 +700,8 @@ fun PlayerScreen(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .auroraGlow(color = AccentPrimary, radius = 16.dp, glowAlpha = 0.35f)
                         .premiumPressableNoScale(onClick = { toggleLock() })
-                        .glassPanel(shape = CircleShape, fill = ScrimStrong, stroke = GlassStrokeBright),
+                        .glassPanelOverVideo(shape = CircleShape, baseAlpha = 0.55f, stroke = GlassStrokeBright),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -673,8 +716,8 @@ fun PlayerScreen(
 
         AnimatedVisibility(
             visible = controlsVisible && !locked,
-            enter = fadeIn(Motion.fade(200)),
-            exit = fadeOut(Motion.fade(180)),
+            enter = Motion.controlsEnter(),
+            exit = Motion.controlsExit(),
             modifier = Modifier.fillMaxSize()
         ) {
             PlayerControls(
@@ -683,26 +726,22 @@ fun PlayerScreen(
                 positionMs = if (scrubbing) scrubTargetMs else currentPositionMs,
                 durationMs = durationMs,
                 bufferedMs = bufferedMs,
-                aspectMode = aspectMode,
-                speedLabel = if (playbackSpeed == 1f) "1x" else "${playbackSpeed}x",
+                skipSeconds = playerPrefs.skipSeconds,
+                playbackAdjusted = playbackSpeed != 1f || aspectMode != AspectMode.FIT ||
+                    orientationMode != OrientationMode.AUTO || sleepTimerEndAt != null,
+                subtitlesOn = selectedSubtitleKey != "off",
                 scrubbing = scrubbing,
                 scrubFrame = scrubFrame,
                 scrubDeltaMs = scrubTargetMs - scrubBaseMs,
-                hasNextEpisode = nextEpisode != null,
                 onBack = onBack,
                 onLock = { toggleLock() },
                 onPip = { enterPip() },
                 onPlayPause = { if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play() },
-                onSkipBack = { seekRelative(-10_000L, true) },
-                onSkipForward = { seekRelative(10_000L, false) },
-                onNextEpisode = { nextEpisode?.let { onPlayNext(it.absolutePath) } },
-                onOpenSubtitles = { activeMenu = ActiveMenu.SUBTITLE_TRACK },
-                onOpenSubtitleStyle = { activeMenu = ActiveMenu.SUBTITLE_STYLE },
+                onSkipBack = { seekRelative(forward = false) },
+                onSkipForward = { seekRelative(forward = true) },
+                onOpenSubtitles = { activeMenu = ActiveMenu.SUBTITLES },
                 onOpenAudio = { activeMenu = ActiveMenu.AUDIO },
-                onOpenSpeed = { activeMenu = ActiveMenu.SPEED },
-                onCycleAspect = { cycleAspect() },
-                onCycleOrientation = { cycleOrientation() },
-                onOpenSleepTimer = { activeMenu = ActiveMenu.SLEEP_TIMER },
+                onOpenPlayback = { activeMenu = ActiveMenu.PLAYBACK },
                 onScrubStart = {
                     scrubbing = true
                     scrubBaseMs = exoPlayer.currentPosition
@@ -719,45 +758,6 @@ fun PlayerScreen(
             )
         }
 
-        // --- Resume prompt ---
-        AnimatedVisibility(
-            visible = resumePromptMs != null,
-            enter = slideInVertically(Motion.gentle()) { it } + fadeIn(Motion.fade()),
-            exit = slideOutVertically(Motion.standard()) { it } + fadeOut(Motion.fade(150)),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            val target = resumePromptMs ?: 0L
-            Row(
-                modifier = Modifier
-                    .padding(bottom = 140.dp, start = Spacing.md, end = Spacing.md)
-                    .glassPanel(
-                        shape = RoundedCornerShape(Radius.lg),
-                        fill = SurfaceCardElevated.copy(alpha = 0.94f),
-                        stroke = GlassStrokeBright
-                    )
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Resume from ${formatTime(target)}?",
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Start over otherwise",
-                        color = TextTertiary,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-                PillButton("Resume") {
-                    exoPlayer.seekTo(target)
-                    resumePromptMs = null
-                }
-            }
-        }
-
         // --- Next episode countdown ---
         AnimatedVisibility(
             visible = nextEpisodeCountdown != null,
@@ -768,10 +768,10 @@ fun PlayerScreen(
             Row(
                 modifier = Modifier
                     .padding(Spacing.lg)
-                    .auroraGlow(color = AccentPrimary, radius = 22.dp, glowAlpha = 0.35f)
-                    .glassPanel(
+                    .glassPanelOverVideo(
                         shape = RoundedCornerShape(Radius.lg),
-                        fill = SurfaceCardElevated.copy(alpha = 0.96f),
+                        baseAlpha = 0.92f,
+                        fill = SurfaceCardElevated.copy(alpha = 0.90f),
                         stroke = GlassStrokeBright
                     )
                     .padding(horizontal = Spacing.md, vertical = Spacing.sm),
@@ -781,13 +781,12 @@ fun PlayerScreen(
                     Text(
                         "Up next in ${nextEpisodeCountdown ?: 0}s",
                         color = TextPrimary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleMedium
                     )
                     Text(
                         nextEpisode?.nameWithoutExtension.orEmpty(),
                         color = TextTertiary,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -799,40 +798,15 @@ fun PlayerScreen(
         }
 
         when (activeMenu) {
-            ActiveMenu.SPEED -> GlassPopupMenu(
-                title = "Playback Speed",
-                options = speedOptions.map { PopupOption(it.toString(), if (it == 1f) "Normal" else "${it}x") },
-                selectedKey = playbackSpeed.toString(),
-                onSelect = { key ->
-                    val speed = key.toFloat()
-                    exoPlayer.playbackParameters = PlaybackParameters(speed)
-                    playbackSpeed = speed
-                    activeMenu = ActiveMenu.NONE
-                },
-                onDismiss = { activeMenu = ActiveMenu.NONE }
-            )
-            ActiveMenu.SUBTITLE_TRACK -> {
-                val trackOptions = subtitleOptionsFrom(currentTracks)
-                val options = listOf(PopupOption("off", "Off")) +
-                    trackOptions.map { PopupOption(it.group.id + "-" + it.trackIndex, it.label) }
-                val selected = selectedSubtitleKey
-                    ?: trackOptions.find { it.selected }?.let { it.group.id + "-" + it.trackIndex }
-                    ?: "off"
-                GlassPopupMenu(
-                    title = "Subtitles",
-                    options = options,
-                    selectedKey = selected,
-                    onSelect = { selectSubtitle(it) },
-                    onDismiss = { activeMenu = ActiveMenu.NONE }
-                )
-            }
             ActiveMenu.AUDIO -> {
                 val audioOpts = audioOptionsFrom(currentTracks)
                 val options = audioOpts.map { PopupOption(it.group.id + "-" + it.trackIndex, it.label) }
                 val selected = selectedAudioKey
                     ?: audioOpts.find { it.selected }?.let { it.group.id + "-" + it.trackIndex }
                 GlassPopupMenu(
-                    title = "Audio",
+                    icon = Icons.Outlined.Headphones,
+                    title = "Audio track",
+                    subtitle = "${options.size} embedded in this file",
                     options = options,
                     selectedKey = selected,
                     onSelect = { selectAudio(it) },
@@ -840,7 +814,9 @@ fun PlayerScreen(
                 )
             }
             ActiveMenu.SLEEP_TIMER -> GlassPopupMenu(
-                title = "Sleep Timer",
+                icon = Icons.Outlined.Timer,
+                title = "Sleep timer",
+                subtitle = "Pause playback automatically",
                 options = sleepTimerOptions.map { PopupOption(it.minutes?.toString() ?: "off", it.label) },
                 selectedKey = if (sleepTimerEndAt == null) "off"
                 else sleepTimerOptions.find { it.label == sleepTimerLabel }?.minutes?.toString(),
@@ -857,22 +833,53 @@ fun PlayerScreen(
                 },
                 onDismiss = { activeMenu = ActiveMenu.NONE }
             )
-            ActiveMenu.SUBTITLE_STYLE -> SubtitleStyleSheet(
-                prefs = subtitlePrefs,
-                subtitleOffsetMs = subtitleOffsetMs,
-                onPrefsChange = {
-                    subtitlePrefs = it
-                    prefsStore.save(it)
+            ActiveMenu.PLAYBACK -> PlaybackSettingsSheet(
+                speed = playbackSpeed,
+                skipSeconds = playerPrefs.skipSeconds,
+                aspectMode = aspectMode,
+                orientationMode = orientationMode,
+                sleepTimerLabel = sleepTimerLabel,
+                hasNextEpisode = nextEpisode != null,
+                onSpeedChange = { speed ->
+                    playbackSpeed = speed
+                    if (!speedBoosted) exoPlayer.playbackParameters = PlaybackParameters(speed)
                 },
-                onOffsetChange = { offset ->
-                    subtitleOffsetMs = offset
-                    // Media3 has no per-track delay API, so shift the whole
-                    // playback position instead: the practical effect the user
-                    // wants when captions run ahead of or behind the audio.
-                    exoPlayer.seekTo((exoPlayer.currentPosition + (offset - subtitleOffsetMs)).coerceAtLeast(0))
+                onSkipSecondsChange = { seconds ->
+                    playerPrefs = playerPrefs.copy(skipSeconds = seconds)
+                    playerPrefsStore.save(playerPrefs)
                 },
+                onAspectChange = { applyAspect(it) },
+                onOrientationChange = { applyOrientation(it) },
+                onOpenSleepTimer = { activeMenu = ActiveMenu.SLEEP_TIMER },
+                onNextEpisode = { nextEpisode?.let { onPlayNext(it.absolutePath) } },
                 onDismiss = { activeMenu = ActiveMenu.NONE }
             )
+            ActiveMenu.SUBTITLES -> {
+                val trackOptions = subtitleOptionsFrom(currentTracks)
+                val tracks = listOf(PopupOption(OFF_TRACK_KEY, "Off")) +
+                    trackOptions.map { PopupOption(it.group.id + "-" + it.trackIndex, it.label) }
+                SubtitleStyleSheet(
+                    prefs = subtitlePrefs,
+                    subtitleOffsetMs = subtitleOffsetMs,
+                    tracks = tracks,
+                    selectedTrackKey = selectedSubtitleKey
+                        ?: trackOptions.find { it.selected }?.let { it.group.id + "-" + it.trackIndex }
+                        ?: OFF_TRACK_KEY,
+                    onSelectTrack = { selectSubtitle(it) },
+                    onPrefsChange = {
+                        subtitlePrefs = it
+                        prefsStore.save(it)
+                    },
+                    onOffsetChange = { offset ->
+                        // Media3 has no per-track delay API, so shift the whole
+                        // playback position instead: the practical effect the user
+                        // wants when captions run ahead of or behind the audio.
+                        exoPlayer.seekTo((exoPlayer.currentPosition + (offset - subtitleOffsetMs)).coerceAtLeast(0))
+                        subtitleOffsetMs = offset
+                    },
+                    onDismiss = { activeMenu = ActiveMenu.NONE }
+                )
+            }
             ActiveMenu.NONE -> {}
         }
     }
@@ -922,39 +929,39 @@ fun PlayerControls(
     positionMs: Long,
     durationMs: Long,
     bufferedMs: Long,
-    aspectMode: AspectMode,
-    speedLabel: String,
+    skipSeconds: Int,
+    playbackAdjusted: Boolean,
+    subtitlesOn: Boolean,
     scrubbing: Boolean,
     scrubFrame: ImageBitmap?,
     scrubDeltaMs: Long,
-    hasNextEpisode: Boolean,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onPip: () -> Unit,
     onPlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
-    onNextEpisode: () -> Unit,
     onOpenSubtitles: () -> Unit,
-    onOpenSubtitleStyle: () -> Unit,
     onOpenAudio: () -> Unit,
-    onOpenSpeed: () -> Unit,
-    onCycleAspect: () -> Unit,
-    onCycleOrientation: () -> Unit,
-    onOpenSleepTimer: () -> Unit,
+    onOpenPlayback: () -> Unit,
     onScrubStart: () -> Unit,
     onScrubMove: (Long) -> Unit,
     onScrubEnd: (Long) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        // Top scrim — a gradient, never an opaque bar, so the video stays the hero.
+        // Dim the whole picture while the controls are up. A real backdrop blur
+        // can't composite over the video SurfaceView, so the depth cue is this
+        // even dim plus the two edge gradients — the same trick that makes the
+        // controls readable over a bright scene without an opaque bar.
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.26f)))
+
         Box(
             Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .background(Brush.verticalGradient(listOf(ScrimStrong, Color.Transparent)))
                 .statusBarsPadding()
-                .padding(top = Spacing.sm, bottom = Spacing.xxl)
+                .padding(top = Spacing.xs, bottom = Spacing.xxl)
         ) {
             Row(
                 modifier = Modifier
@@ -963,15 +970,14 @@ fun PlayerControls(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TransportIconButton(
-                    icon = Icons.Filled.ArrowBackIosNew,
+                    icon = Icons.Rounded.ArrowBackIosNew,
                     contentDescription = "Back",
-                    iconSize = 15.dp,
+                    iconSize = 16.dp,
                     onClick = onBack
                 )
                 Text(
                     title,
                     color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -986,32 +992,30 @@ fun PlayerControls(
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 TransportIconButton(
-                    icon = Icons.Filled.Lock,
+                    icon = Icons.Outlined.Lock,
                     contentDescription = "Lock controls",
                     onClick = onLock
                 )
             }
         }
 
-        // Centre transport.
+        // Centre transport. One dominant element, two quiet ones: the skip
+        // glyphs carry no disc at all, so the play button is the only thing with
+        // a surface behind it and the eye goes straight there.
         Row(
             modifier = Modifier.align(Alignment.Center),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xxl)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
-            TransportIconButton(
-                icon = Icons.Outlined.Replay10,
-                contentDescription = "Back 10 seconds",
-                size = 50.dp,
-                iconSize = 24.dp,
+            SkipButton(
+                icon = Icons.Rounded.KeyboardDoubleArrowLeft,
+                contentDescription = "Back $skipSeconds seconds",
                 onClick = onSkipBack
             )
             PlayPauseButton(isPlaying = isPlaying, onClick = onPlayPause)
-            TransportIconButton(
-                icon = Icons.Outlined.Forward10,
-                contentDescription = "Forward 10 seconds",
-                size = 50.dp,
-                iconSize = 24.dp,
+            SkipButton(
+                icon = Icons.Rounded.KeyboardDoubleArrowRight,
+                contentDescription = "Forward $skipSeconds seconds",
                 onClick = onSkipForward
             )
         }
@@ -1056,90 +1060,108 @@ fun PlayerControls(
                     .padding(horizontal = Spacing.xxs),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    formatTime(positionMs),
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text(formatTime(positionMs), color = TextPrimary, style = TimeLabel)
                 Text(
                     "-${formatTime((durationMs - positionMs).coerceAtLeast(0))}",
                     color = TextTertiary,
-                    style = MaterialTheme.typography.labelMedium
+                    style = TimeLabel
                 )
             }
 
             Spacer(Modifier.height(Spacing.sm))
 
-            // The quick row sits below the bar on its own glass dock. Bare
-            // floating icons over video read as unfinished; the dock groups
-            // them and gives the whole overlay a bottom edge.
+            // Three actions, not eight. Speed, aspect, rotation, sleep timer and
+            // next-episode all moved into the Playback sheet, and subtitle track
+            // selection merged into the Subtitles sheet — they were separate 20dp
+            // targets competing with the two people actually reach for
+            // mid-episode, which are subtitles and audio.
+            //
+            // All three glyphs come from the Outlined set. The Rounded set mixes
+            // solid and hairline shapes (Subtitles and ClosedCaption render as
+            // filled blocks next to a hairline Tune), which is what made the row
+            // look assembled from different icon packs.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .glassPanel(
+                    .glassPanelOverVideo(
                         shape = RoundedCornerShape(Radius.xl),
+                        baseAlpha = 0.34f,
                         fill = GlassFill,
-                        stroke = HairlineLight
+                        stroke = HairlineMid
                     )
-                    .padding(vertical = Spacing.xxs),
+                    .padding(vertical = Spacing.xs),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                QuickIcon(Icons.Outlined.Subtitles, "Subtitles", onClick = onOpenSubtitles)
-                QuickIcon(Icons.Outlined.ClosedCaption, "Style", onClick = onOpenSubtitleStyle)
-                QuickIcon(Icons.Outlined.Audiotrack, "Audio", onClick = onOpenAudio)
-                QuickIcon(
-                    Icons.Outlined.Speed,
-                    speedLabel,
-                    active = speedLabel != "1x",
-                    onClick = onOpenSpeed
+                DockAction(
+                    Icons.Outlined.ClosedCaption,
+                    "Subtitles",
+                    active = subtitlesOn,
+                    onClick = onOpenSubtitles
                 )
-                QuickIcon(
-                    Icons.Outlined.AspectRatio,
-                    aspectMode.label,
-                    active = aspectMode != AspectMode.FIT,
-                    onClick = onCycleAspect
+                DockAction(Icons.Outlined.Headphones, "Audio", onClick = onOpenAudio)
+                DockAction(
+                    Icons.Outlined.Tune,
+                    "Playback",
+                    active = playbackAdjusted,
+                    onClick = onOpenPlayback
                 )
-                QuickIcon(Icons.Outlined.ScreenRotation, "Rotate", onClick = onCycleOrientation)
-                QuickIcon(Icons.Outlined.Timer, "Sleep", onClick = onOpenSleepTimer)
-                if (hasNextEpisode) {
-                    QuickIcon(Icons.Outlined.SkipNext, "Next", onClick = onNextEpisode)
-                }
             }
         }
     }
 }
 
 /**
- * The play/pause control: a plain glyph on a low-opacity gray disc, with the
- * disc brightening and a soft aurora glow blooming while playing. The old
- * solid-white circle read as a stock placeholder against the video.
+ * The play/pause control. Deliberately the largest thing on screen after the
+ * video: a wide translucent disc that brightens while playing, with the glyph
+ * sized to fill it rather than floating in the middle of an oversized circle.
  */
 @Composable
 private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit) {
-    val glow by animateFloatAsState(
-        targetValue = if (isPlaying) 0.20f else 0.10f,
+    val base by animateFloatAsState(
+        targetValue = if (isPlaying) 0.30f else 0.42f,
         animationSpec = Motion.standard(),
-        label = "playpause-glow"
+        label = "playpause-base"
     )
     Box(
         modifier = Modifier
-            .size(72.dp)
-            .auroraGlow(color = AccentPrimary, radius = 10.dp, glowAlpha = glow)
-            .premiumPressable(scaleDown = 0.90f, onClick = onClick)
-            .glassPanel(
+            .size(84.dp)
+            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.72f, onClick = onClick)
+            .glassPanelOverVideo(
                 shape = CircleShape,
-                fill = ControlCircleFill,
-                stroke = ControlCircleStroke
+                baseAlpha = base,
+                fill = GlassFillStrong,
+                stroke = GlassStrokeBright,
+                strokeWidth = 1.dp
             ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+            if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
             contentDescription = if (isPlaying) "Pause" else "Play",
             tint = Color.White,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(40.dp)
+        )
+    }
+}
+
+/**
+ * Skip back/forward. No disc, no label, ~60% of the play button's optical
+ * weight — present when you look for it, invisible when you don't.
+ */
+@Composable
+private fun SkipButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .premiumPressableSoft(scaleDown = 0.86f, dimTo = 0.55f, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Color.White.copy(alpha = 0.70f),
+            modifier = Modifier.size(30.dp)
         )
     }
 }
@@ -1148,10 +1170,6 @@ private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit) {
 private fun PillButton(label: String, filled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .then(
-                if (filled) Modifier.auroraGlow(color = AccentPrimary, radius = 10.dp, glowAlpha = 0.35f)
-                else Modifier
-            )
             .premiumPressable(onClick = onClick)
             .glassPanel(
                 shape = CircleShape,
@@ -1161,45 +1179,38 @@ private fun PillButton(label: String, filled: Boolean = true, onClick: () -> Uni
             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            label,
-            color = Color.White,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold
-        )
+        Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
     }
 }
 
 /**
- * One item on the bottom dock. The label always renders, so every icon sits on
- * the same baseline — captioning only the stateful ones left the row ragged.
+ * One item on the bottom dock. Four of these means each gets a 24dp glyph and
+ * room to breathe, instead of eight 20dp glyphs shoulder to shoulder.
  */
 @Composable
-private fun QuickIcon(
+private fun DockAction(
     icon: ImageVector,
     label: String,
     active: Boolean = false,
     onClick: () -> Unit
 ) {
     val tint by animateColorAsState(
-        targetValue = if (active) AccentGlow else TextPrimary.copy(alpha = 0.88f),
+        targetValue = if (active) AccentBright else Color.White.copy(alpha = 0.90f),
         animationSpec = Motion.standard(),
-        label = "quick-tint"
+        label = "dock-tint"
     )
     Column(
         modifier = Modifier
-            .premiumPressable(scaleDown = 0.86f, onClick = onClick)
-            .padding(horizontal = Spacing.xxs, vertical = 6.dp),
+            .premiumPressable(scaleDown = 0.90f, onClick = onClick)
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.height(3.dp))
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(5.dp))
         Text(
             label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
-            color = if (active) tint else TextTertiary,
-            fontWeight = FontWeight.SemiBold,
+            style = BadgeLabel,
+            color = if (active) tint else TextSecondary,
             maxLines = 1
         )
     }
@@ -1217,10 +1228,20 @@ private fun TransportIconButton(
         modifier = Modifier
             .size(size)
             .premiumPressable(scaleDown = 0.88f, onClick = onClick)
-            .glassPanel(shape = CircleShape, fill = GlassFillLight, stroke = GlassStroke),
+            .glassPanelOverVideo(
+                shape = CircleShape,
+                baseAlpha = 0.30f,
+                fill = GlassFill,
+                stroke = GlassStroke
+            ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(iconSize))
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Color.White.copy(alpha = 0.92f),
+            modifier = Modifier.size(iconSize)
+        )
     }
 }
 

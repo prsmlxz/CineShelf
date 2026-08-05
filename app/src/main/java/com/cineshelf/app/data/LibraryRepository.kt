@@ -150,6 +150,7 @@ class LibraryRepository(private val context: Context) {
             else -> file.nameWithoutExtension
         }
         val thumb = ThumbnailUtil.getOrCreateThumbnail(context, file)
+        val info = mediaInfoFor(file)
         return VideoItem(
             file = file,
             displayTitle = displayTitle,
@@ -159,8 +160,22 @@ class LibraryRepository(private val context: Context) {
             positionMs = metadata.getPosition(file.absolutePath),
             durationMs = metadata.getDuration(file.absolutePath),
             lastPlayedAt = metadata.getLastPlayedAt(file.absolutePath),
-            thumbnailPath = thumb
+            thumbnailPath = thumb,
+            mediaInfo = info
         )
+    }
+
+    /**
+     * Reading a container's track table costs a few milliseconds per file, which
+     * across a large library on a first scan is noticeable — so the result is
+     * cached alongside the watch metadata and only re-read when the file changes.
+     */
+    private fun mediaInfoFor(file: File): MediaInfo? {
+        val stamp = file.lastModified()
+        metadata.getMediaInfo(file.absolutePath, stamp)?.let { return it }
+        val fresh = MediaInfoExtractor.extract(file) ?: return null
+        metadata.putMediaInfo(file.absolutePath, stamp, fresh)
+        return fresh
     }
 
     fun setWatched(item: VideoItem, watched: Boolean) = metadata.setWatched(item.id, watched)

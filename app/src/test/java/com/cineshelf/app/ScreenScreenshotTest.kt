@@ -3,11 +3,15 @@ package com.cineshelf.app
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cineshelf.app.data.AudioTrackInfo
 import com.cineshelf.app.data.ContinueWatchingEntry
+import com.cineshelf.app.data.MediaInfo
 import com.cineshelf.app.data.SeasonGroup
 import com.cineshelf.app.data.ShowItem
 import com.cineshelf.app.data.SubtitlePrefs
@@ -17,7 +21,12 @@ import com.cineshelf.app.ui.library.LibraryContent
 import com.cineshelf.app.ui.library.LibraryUiState
 import com.cineshelf.app.ui.permission.PermissionScreen
 import com.cineshelf.app.ui.player.AspectMode
+import com.cineshelf.app.ui.player.GlassPopupMenu
+import com.cineshelf.app.ui.player.OFF_TRACK_KEY
+import com.cineshelf.app.ui.player.OrientationMode
+import com.cineshelf.app.ui.player.PlaybackSettingsSheet
 import com.cineshelf.app.ui.player.PlayerControls
+import com.cineshelf.app.ui.player.PopupOption
 import com.cineshelf.app.ui.player.SubtitleStyleSheet
 import com.cineshelf.app.ui.theme.CineShelfTheme
 import com.cineshelf.app.ui.theme.auroraBackdrop
@@ -94,6 +103,21 @@ class ScreenScreenshotTest {
         }
     }
 
+    /** A single movie: the hero carries the film's own technical facts. */
+    @Test
+    fun movieDetail() = capture("movie-detail.png") {
+        Box(Modifier.fillMaxSize().auroraBackdrop()) {
+            ShowContent(
+                show = Fixtures.shows[2],
+                hiddenIds = emptyList(),
+                onBack = {},
+                onPlay = {},
+                onToggleWatched = {},
+                onDelete = {}
+            )
+        }
+    }
+
     @Test
     fun permission() = capture("permission.png") {
         PermissionScreen()
@@ -107,33 +131,141 @@ class ScreenScreenshotTest {
             positionMs = 22 * 60_000L + 14_000L,
             durationMs = 47 * 60_000L + 32_000L,
             bufferedMs = 30 * 60_000L,
-            aspectMode = AspectMode.FIT,
-            speedLabel = "1x",
+            skipSeconds = 10,
+            playbackAdjusted = false,
+            subtitlesOn = true,
             scrubbing = false,
             scrubFrame = null,
             scrubDeltaMs = 0L,
-            hasNextEpisode = true,
             onBack = {}, onLock = {}, onPip = {}, onPlayPause = {},
-            onSkipBack = {}, onSkipForward = {}, onNextEpisode = {},
-            onOpenSubtitles = {}, onOpenSubtitleStyle = {}, onOpenAudio = {},
-            onOpenSpeed = {}, onCycleAspect = {}, onCycleOrientation = {},
-            onOpenSleepTimer = {}, onScrubStart = {}, onScrubMove = {}, onScrubEnd = {}
+            onSkipBack = {}, onSkipForward = {},
+            onOpenSubtitles = {}, onOpenAudio = {},
+            onOpenPlayback = {}, onScrubStart = {}, onScrubMove = {}, onScrubEnd = {}
+        )
+    }
+
+    /** The scrubbing state: expanded bar, preview card riding above the thumb. */
+    @Test
+    fun playerScrubbing() = capture("player-scrubbing.png") {
+        PlayerControls(
+            title = "Dune: Part Two",
+            isPlaying = false,
+            positionMs = 62 * 60_000L,
+            durationMs = 166 * 60_000L,
+            bufferedMs = 70 * 60_000L,
+            skipSeconds = 30,
+            playbackAdjusted = true,
+            subtitlesOn = false,
+            scrubbing = true,
+            scrubFrame = null,
+            scrubDeltaMs = 95_000L,
+            onBack = {}, onLock = {}, onPip = {}, onPlayPause = {},
+            onSkipBack = {}, onSkipForward = {},
+            onOpenSubtitles = {}, onOpenAudio = {},
+            onOpenPlayback = {}, onScrubStart = {}, onScrubMove = {}, onScrubEnd = {}
         )
     }
 
     @Test
-    fun subtitleStyleSheet() = capture("subtitle-style.png") {
+    fun subtitleSheet() = capture("subtitle-sheet.png") {
         SubtitleStyleSheet(
             prefs = SubtitlePrefs(),
             subtitleOffsetMs = 0L,
+            tracks = listOf(
+                PopupOption(OFF_TRACK_KEY, "Off"),
+                PopupOption("en", "English", "SRT"),
+                PopupOption("en-sdh", "English (SDH)", "SRT"),
+                PopupOption("es", "Español", "ASS")
+            ),
+            selectedTrackKey = "en",
+            onSelectTrack = {},
             onPrefsChange = {},
             onOffsetChange = {},
+            onDismiss = {}
+        )
+    }
+
+    /** Track off: the styling controls below should read as dimmed. */
+    @Test
+    fun subtitleSheetOff() = capture("subtitle-sheet-off.png") {
+        SubtitleStyleSheet(
+            prefs = SubtitlePrefs(),
+            subtitleOffsetMs = -1500L,
+            tracks = listOf(PopupOption(OFF_TRACK_KEY, "Off")),
+            selectedTrackKey = OFF_TRACK_KEY,
+            onSelectTrack = {},
+            onPrefsChange = {},
+            onOffsetChange = {},
+            onDismiss = {}
+        )
+    }
+
+    @Test
+    fun playbackSettingsSheet() = capture("playback-settings.png") {
+        PlaybackSettingsSheet(
+            speed = 1.25f,
+            skipSeconds = 10,
+            aspectMode = AspectMode.FIT,
+            orientationMode = OrientationMode.AUTO,
+            sleepTimerLabel = "Off",
+            hasNextEpisode = true,
+            onSpeedChange = {},
+            onSkipSecondsChange = {},
+            onAspectChange = {},
+            onOrientationChange = {},
+            onOpenSleepTimer = {},
+            onNextEpisode = {},
+            onDismiss = {}
+        )
+    }
+
+    @Test
+    fun audioTrackMenu() = capture("audio-track-menu.png") {
+        GlassPopupMenu(
+            icon = Icons.Outlined.Headphones,
+            title = "Audio track",
+            subtitle = "3 embedded in this file",
+            options = listOf(
+                PopupOption("en-atmos", "English", "TrueHD Atmos 7.1"),
+                PopupOption("en-ac3", "English", "AC-3 5.1"),
+                PopupOption("commentary", "Director's commentary", "AAC 2.0")
+            ),
+            selectedKey = "en-atmos",
+            onSelect = {},
             onDismiss = {}
         )
     }
 }
 
 private object Fixtures {
+    /** A typical 1080p web-rip episode: H.264, stereo AAC, one caption track. */
+    private val episodeInfo = MediaInfo(
+        durationMs = 47 * 60_000L,
+        width = 1920,
+        height = 1080,
+        videoCodec = "H.264",
+        hdrFormat = null,
+        audioTracks = listOf(AudioTrackInfo("English", "AAC", 2)),
+        subtitleTrackCount = 1,
+        fileSizeBytes = 2_100_000_000L
+    )
+
+    /** A 4K HDR remux: the case where every badge is populated. */
+    private val filmInfo = MediaInfo(
+        durationMs = 166 * 60_000L,
+        width = 3840,
+        height = 1608,
+        videoCodec = "HEVC",
+        hdrFormat = "HDR10",
+        audioTracks = listOf(
+            AudioTrackInfo("English", "Dolby TrueHD", 8),
+            AudioTrackInfo("English", "Dolby Digital", 6),
+            AudioTrackInfo("Spanish", "AAC", 2)
+        ),
+        subtitleTrackCount = 4,
+        fileSizeBytes = 48_300_000_000L
+    )
+
     private fun episode(
         show: String,
         season: Int,
@@ -150,7 +282,8 @@ private object Fixtures {
         positionMs = positionMs,
         durationMs = 47 * 60_000L,
         lastPlayedAt = 0L,
-        thumbnailPath = null
+        thumbnailPath = null,
+        mediaInfo = episodeInfo
     )
 
     private val breakingBad = ShowItem(
@@ -209,7 +342,8 @@ private object Fixtures {
                 positionMs = 41 * 60_000L,
                 durationMs = 166 * 60_000L,
                 lastPlayedAt = 0L,
-                thumbnailPath = null
+                thumbnailPath = null,
+                mediaInfo = filmInfo
             )
         ),
         posterPath = null
@@ -229,7 +363,8 @@ private object Fixtures {
                 positionMs = 0L,
                 durationMs = 164 * 60_000L,
                 lastPlayedAt = 0L,
-                thumbnailPath = null
+                thumbnailPath = null,
+                mediaInfo = filmInfo
             )
         ),
         posterPath = null

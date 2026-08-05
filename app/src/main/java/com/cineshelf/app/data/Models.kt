@@ -15,12 +15,20 @@ data class VideoItem(
     val positionMs: Long,
     val durationMs: Long,
     val lastPlayedAt: Long,
-    val thumbnailPath: String?
+    val thumbnailPath: String?,
+    val mediaInfo: MediaInfo? = null
 ) {
     val id: String get() = file.absolutePath
     val progressFraction: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
     val isInProgress: Boolean get() = !watched && positionMs > 15_000L && durationMs > 0
+
+    /**
+     * Duration from the container when playback hasn't recorded one yet, so a
+     * never-opened file still shows its runtime.
+     */
+    val effectiveDurationMs: Long
+        get() = if (durationMs > 0) durationMs else mediaInfo?.durationMs ?: 0L
 }
 
 data class SeasonGroup(

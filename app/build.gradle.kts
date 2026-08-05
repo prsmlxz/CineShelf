@@ -94,6 +94,9 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+    // Declared explicitly rather than leaned on transitively: the player configures
+    // the extractor directly to enable constant-bitrate seeking.
+    implementation("androidx.media3:media3-extractor:1.4.1")
 
     implementation("io.coil-kt:coil-compose:2.6.0")
 
