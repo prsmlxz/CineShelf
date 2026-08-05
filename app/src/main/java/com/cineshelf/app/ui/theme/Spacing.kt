@@ -18,13 +18,17 @@ object Spacing {
     val xxxl = 40.dp
 }
 
-/** Consistent corner radii. Generous by default — round, soft, modern. */
+/**
+ * Corner radii, tuned to One UI's proportions: rounded, but never so round that
+ * a card starts reading as a pill. The previous 36dp sheet corner was wide
+ * enough to eat into the first row of content.
+ */
 object Radius {
     val xs = 8.dp
     val sm = 12.dp
     val md = 16.dp
-    val lg = 22.dp
-    val xl = 28.dp
-    val xxl = 36.dp
+    val lg = 20.dp
+    val xl = 24.dp
+    val xxl = 28.dp
     val pill = 999.dp
 }

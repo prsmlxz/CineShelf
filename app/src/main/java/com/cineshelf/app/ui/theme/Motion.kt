@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -41,20 +40,26 @@ import androidx.compose.ui.unit.dp
 //
 // Two families, used for different jobs:
 //
-//   Springs  — anything the finger is currently touching (press scale, a thumb
-//              tracking a drag). Springs retarget mid-flight, so rapid repeated
-//              input never queues up or stutters.
-//   Easings  — anything that plays out on its own after a gesture ends: fades,
-//              menu entrances, controls appearing. These are duration-based and
-//              all live in the 180-300ms band, which is long enough to read as
-//              deliberate and short enough to never feel like waiting.
+//   Springs  — anything the finger is currently touching, and anything with
+//              physical presence (a sheet arriving, a thumb tracking a drag).
+//              Springs retarget mid-flight, so rapid input never queues up.
+//   Easings  — flat cross-fades where nothing moves through space: controls
+//              appearing over video, a colour changing.
 //
-// Nothing in the app should change state instantly.
+// Timings are deliberate, not defaults:
+//
+//   Tap response   140ms — fast enough to read as caused by the finger.
+//   Press scale    0.97  — a compression, not a shrink. Visible at a glance,
+//                          invisible as an effect.
+//   Sheets       ~280ms  — spring, so it decelerates into place with mass.
+//
+// Nothing in the app changes state instantly.
 // ---------------------------------------------------------------------------
 
 object Motion {
     // --- Durations (ms) --------------------------------------------------
-    const val Instant = 120
+    /** Touch acknowledgement. */
+    const val Instant = 140
     const val Quick = 180
     const val Base = 240
     const val Relaxed = 300
@@ -77,17 +82,21 @@ object Motion {
     fun <T> snap(): FiniteAnimationSpec<T> =
         spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessHigh)
 
-    /** Default UI spring — a trace of overshoot so elements feel alive. */
+    /** Default UI spring. Nearly critically damped — settles, never wobbles. */
     fun <T> standard(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 0.75f, stiffness = 380f)
+        spring(dampingRatio = 0.9f, stiffness = 500f)
 
-    /** Playful spring for elements that grow/pop (scrubber expansion, badges). */
+    /**
+     * For controls that grow under the finger (scrubber rails, slider thumb).
+     * A trace of overshoot only — the previous 0.58 damping visibly bounced,
+     * which reads as a toy rather than as a precision control.
+     */
     fun <T> bouncy(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 0.58f, stiffness = 420f)
+        spring(dampingRatio = 0.8f, stiffness = 420f)
 
-    /** Heavier spring for large surfaces (sheets, panels) so they feel weighty. */
+    /** Sheets and large panels. Weighty, no overshoot, ~280ms to rest. */
     fun <T> gentle(): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 0.85f, stiffness = 220f)
+        spring(dampingRatio = 0.92f, stiffness = 340f)
 
     // --- Tweens ----------------------------------------------------------
     fun <T> fade(durationMs: Int = Base): FiniteAnimationSpec<T> =
@@ -100,37 +109,41 @@ object Motion {
         tween(durationMs, easing = accelerate)
 
     // --- Composite transitions -------------------------------------------
-    /**
-     * Menus and popups: fade up from 96% scale, anchored to the given origin so
-     * a sheet grows from its edge rather than from thin air.
-     */
+    /** Dialogs and popups: fade with a whisper of scale, never from nothing. */
     fun menuEnter(origin: TransformOrigin = TransformOrigin(0.5f, 1f)): EnterTransition =
-        fadeIn(enter(Base)) + scaleIn(enter(Base), initialScale = 0.96f, transformOrigin = origin)
+        fadeIn(enter(Base)) + scaleIn(enter(Base), initialScale = 0.97f, transformOrigin = origin)
 
     fun menuExit(origin: TransformOrigin = TransformOrigin(0.5f, 1f)): ExitTransition =
-        fadeOut(exit(Quick)) + scaleOut(exit(Quick), targetScale = 0.97f, transformOrigin = origin)
+        fadeOut(exit(Quick)) + scaleOut(exit(Quick), targetScale = 0.98f, transformOrigin = origin)
 
-    /** Bottom sheets: rise a short distance while fading, never a full slide. */
+    /**
+     * Bottom sheets. The slide is spring-driven so the sheet decelerates into
+     * its resting position with mass behind it; a tween of the same duration
+     * arrives at a constant-feeling stop and reads as cheaper.
+     */
     fun sheetEnter(): EnterTransition =
-        fadeIn(enter(Base)) + slideInVertically(tween(Base, easing = decelerate)) { it / 6 }
+        fadeIn(tween(Quick, easing = smooth)) + slideInVertically(gentle()) { it / 3 }
 
     fun sheetExit(): ExitTransition =
-        fadeOut(exit(Quick)) + slideOutVertically(tween(Quick, easing = accelerate)) { it / 8 }
+        fadeOut(exit(Quick)) + slideOutVertically(tween(Base, easing = accelerate)) { it / 4 }
 
-    /** Playback controls: a plain, unhurried cross-fade. No movement. */
+    /** Playback controls: a plain, unhurried cross-fade. */
     fun controlsEnter(): EnterTransition = fadeIn(tween(Relaxed, easing = smooth))
 
     fun controlsExit(): ExitTransition = fadeOut(tween(Base, easing = smooth))
 }
 
 /**
- * Immediate physical press feedback, replacing Material's ripple. The scale
- * starts changing on the same frame as touch-down, which is the single biggest
- * lever for making taps feel instant rather than laggy.
+ * Touch feedback: a compression to 97% and back.
+ *
+ * The scale starts changing on the same frame as touch-down, which is the
+ * single biggest lever for making a tap feel instant. The depth is deliberately
+ * shallow — a control that visibly shrinks looks squashed; one that compresses
+ * looks pressed.
  */
 @Composable
 fun Modifier.premiumPressable(
-    scaleDown: Float = 0.94f,
+    scaleDown: Float = 0.97f,
     enabled: Boolean = true,
     onClick: () -> Unit
 ): Modifier {
@@ -152,13 +165,14 @@ fun Modifier.premiumPressable(
 }
 
 /**
- * Press feedback that both scales and dims. Used for the large transport
- * controls, where a scale alone is too subtle against moving video.
+ * Compression plus dim, for bare glyphs floating over video. With no surface to
+ * compress against, the scale alone is too subtle to register; the dim is what
+ * actually carries the acknowledgement.
  */
 @Composable
 fun Modifier.premiumPressableSoft(
-    scaleDown: Float = 0.90f,
-    dimTo: Float = 0.78f,
+    scaleDown: Float = 0.94f,
+    dimTo: Float = 0.6f,
     enabled: Boolean = true,
     onClick: () -> Unit
 ): Modifier {
@@ -186,8 +200,8 @@ fun Modifier.premiumPressableSoft(
 }
 
 /**
- * Press feedback that dims instead of scaling — for rows inside menus and
- * lists, where a scaling row looks broken next to its neighbours.
+ * Dim without scale — for rows inside menus and lists, where a scaling row
+ * looks broken next to its neighbours.
  */
 @Composable
 fun Modifier.premiumPressableNoScale(
@@ -197,7 +211,7 @@ fun Modifier.premiumPressableNoScale(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressAlpha by animateFloatAsState(
-        targetValue = if (pressed && enabled) 0.6f else 1f,
+        targetValue = if (pressed && enabled) 0.55f else 1f,
         animationSpec = Motion.snap(),
         label = "press-alpha"
     )
@@ -212,116 +226,59 @@ fun Modifier.premiumPressableNoScale(
 }
 
 /**
- * Translucent fill + hairline border. Real backdrop blur needs API 31+
- * RenderEffect and does not composite over a video SurfaceView, so the illusion
- * of depth comes from a top-lit gradient overlay instead: brighter along the top
- * edge, fading down, the way glass catches light.
+ * A flat translucent panel.
+ *
+ * This previously also painted a white top-lit gradient and a bright rim on
+ * every surface it touched, which is precisely what made the app read as
+ * glassmorphism rather than as a dark interface: dozens of panels each
+ * announcing their own edge. It is now a fill and nothing else — the border is
+ * opt-in by passing a non-transparent [stroke], and almost nothing should.
  */
 fun Modifier.glassPanel(
     shape: Shape = RoundedCornerShape(Radius.lg),
     fill: Color = GlassFill,
-    stroke: Color = GlassStroke,
+    stroke: Color = Color.Transparent,
     strokeWidth: Dp = 1.dp
 ): Modifier = this
     .clip(shape)
     .background(fill)
-    .background(
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = 0.055f),
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.06f)
-            )
-        )
-    )
-    .border(strokeWidth, stroke, shape)
+    .then(if (stroke == Color.Transparent) Modifier else Modifier.border(strokeWidth, stroke, shape))
 
 /**
- * A heavier glass for surfaces that float directly over video — an opaque black
- * base beneath the translucent fill, so subtitles and bright frames underneath
- * can't bleed through and muddy the panel.
+ * Panel for surfaces floating directly over video: an opaque black base beneath
+ * the translucent fill, so bright frames underneath can't bleed through and
+ * muddy the panel. No sheen, no rim.
  */
 fun Modifier.glassPanelOverVideo(
     shape: Shape = RoundedCornerShape(Radius.lg),
     baseAlpha: Float = 0.55f,
     fill: Color = GlassFill,
-    stroke: Color = GlassStroke,
+    stroke: Color = Color.Transparent,
     strokeWidth: Dp = 1.dp
 ): Modifier = this
     .clip(shape)
     .background(Color.Black.copy(alpha = baseAlpha))
     .background(fill)
-    .background(
-        Brush.verticalGradient(
-            listOf(
-                Color.White.copy(alpha = 0.07f),
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.05f)
-            )
-        )
-    )
-    .border(strokeWidth, stroke, shape)
+    .then(if (stroke == Color.Transparent) Modifier else Modifier.border(strokeWidth, stroke, shape))
 
 /**
- * Casts a soft glow outward from behind an element. Drawn as a tinted radial
- * gradient underneath rather than an elevation shadow, so it can carry the
- * accent colour. Kept deliberately faint — a glow is a hint, not a light source.
- */
-fun Modifier.auroraGlow(
-    color: Color = AccentPrimary,
-    radius: Dp = 24.dp,
-    glowAlpha: Float = 0.35f,
-    cornerRadius: Dp = 100.dp
-): Modifier = this.drawBehind {
-    drawRoundRect(
-        brush = Brush.radialGradient(
-            colors = listOf(color.copy(alpha = glowAlpha), Color.Transparent),
-            center = Offset(size.width / 2f, size.height / 2f),
-            radius = (size.maxDimension / 2f) + radius.toPx()
-        ),
-        cornerRadius = CornerRadius(cornerRadius.toPx())
-    )
-}
-
-/**
- * The ambient wash painted behind screen content. Two near-neutral lifts keep
- * the pure black from reading as a flat void, and a single very faint accent
- * bleed sits low and centre — the only colour on an otherwise monochrome
- * background.
+ * The ambient wash behind screen content: black, with one barely-there neutral
+ * lift at the top so it reads as a deep surface rather than a void.
+ *
+ * There is deliberately no accent bleed. A tinted backdrop is what made every
+ * screen look purple regardless of what was actually drawn on it.
  */
 fun Modifier.auroraBackdrop(): Modifier = this.drawBehind {
     drawRect(BackgroundPrimary)
 
-    val topLeft = Offset(size.width * 0.10f, -size.height * 0.02f)
+    val top = Offset(size.width * 0.5f, -size.height * 0.10f)
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(BleedNeutral, Color.Transparent),
-            center = topLeft,
-            radius = size.width * 1.0f
+            center = top,
+            radius = size.width * 1.15f
         ),
-        radius = size.width * 1.0f,
-        center = topLeft
-    )
-
-    val topRight = Offset(size.width * 1.02f, size.height * 0.14f)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(BleedNeutralSoft, Color.Transparent),
-            center = topRight,
-            radius = size.width * 0.85f
-        ),
-        radius = size.width * 0.85f,
-        center = topRight
-    )
-
-    val bottom = Offset(size.width * 0.5f, size.height * 1.0f)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(BleedAccent, Color.Transparent),
-            center = bottom,
-            radius = size.width * 0.9f
-        ),
-        radius = size.width * 0.9f,
-        center = bottom
+        radius = size.width * 1.15f,
+        center = top
     )
 }

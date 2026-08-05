@@ -26,9 +26,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -63,7 +63,7 @@ import com.cineshelf.app.ui.theme.ScrimMedium
 import com.cineshelf.app.ui.theme.ScrimStrong
 import com.cineshelf.app.ui.theme.SectionEyebrow
 import com.cineshelf.app.ui.theme.Spacing
-import com.cineshelf.app.ui.theme.SurfaceCardElevated
+import com.cineshelf.app.ui.theme.SurfaceSheet
 import com.cineshelf.app.ui.theme.SurfaceRaised
 import com.cineshelf.app.ui.theme.TextPrimary
 import com.cineshelf.app.ui.theme.TextSecondary
@@ -74,38 +74,28 @@ import com.cineshelf.app.ui.theme.premiumPressableNoScale
 data class PopupOption(val key: String, val label: String, val trailing: String? = null)
 
 /**
- * Shared header for every sheet: an accent-tinted glyph, a title, and a line of
- * context. Previously all four sheets opened with the same bare grey caption,
- * which is what made them indistinguishable from one another.
+ * Shared header for every sheet: a title and a line of context, set against the
+ * sheet's own surface.
+ *
+ * The tinted glyph tile that used to lead this row put a purple square at the
+ * top of all four sheets — four identical badges that carried no information the
+ * title didn't already state, and made the accent the first thing read.
  */
 @Composable
 fun SheetHeader(icon: ImageVector, title: String, subtitle: String?) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
     ) {
-        Box(
-            Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(Radius.sm))
-                .background(AccentSoft),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = AccentBright,
-                modifier = Modifier.size(18.dp)
+        Text(title, style = MaterialTheme.typography.headlineMedium, color = TextPrimary)
+        if (subtitle != null) {
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextTertiary,
+                modifier = Modifier.padding(top = 2.dp)
             )
-        }
-        Spacer(Modifier.width(Spacing.sm))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = TextPrimary)
-            if (subtitle != null) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = TextTertiary)
-            }
         }
     }
 }
@@ -115,16 +105,20 @@ fun SheetHeader(icon: ImageVector, title: String, subtitle: String?) {
 fun SheetGrabber() {
     Box(
         Modifier
-            .padding(bottom = Spacing.xs)
+            .padding(top = Spacing.xs, bottom = Spacing.sm)
             .size(width = 34.dp, height = 4.dp)
             .background(HairlineStrong, RoundedCornerShape(Radius.pill))
     )
 }
 
 /**
- * Bottom-anchored sheet used for every "choose one" control. The scrim dims the
- * video behind it so the sheet reads as floating above the picture rather than
- * pasted onto it.
+ * Bottom-anchored sheet used for every "choose one" control.
+ *
+ * A One UI sheet is a *place*, not a filter: it is opaque, edge-to-edge, rounded
+ * only at the top, and it has no border. The previous version floated a
+ * translucent bordered card inset from all four sides, which put a bright rim
+ * around the brightest thing on screen and left a strip of video visible beneath
+ * it that read as a rendering mistake.
  */
 @Composable
 fun BoxScope.GlassPopupMenu(
@@ -146,65 +140,51 @@ fun BoxScope.GlassPopupMenu(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(Spacing.sm)
-            .glassPanelOverVideo(
-                shape = RoundedCornerShape(Radius.xxl),
-                baseAlpha = 0.90f,
-                fill = SurfaceCardElevated.copy(alpha = 0.86f),
-                stroke = GlassStrokeBright
-            )
-            .padding(vertical = Spacing.sm)
+            .clip(RoundedCornerShape(topStart = Radius.xxl, topEnd = Radius.xxl))
+            .background(SurfaceSheet)
+            .padding(bottom = Spacing.md)
     ) {
         Box(Modifier.align(Alignment.CenterHorizontally)) { SheetGrabber() }
         SheetHeader(icon = icon, title = title, subtitle = subtitle)
         Spacer(Modifier.height(Spacing.xs))
-        LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+        LazyColumn(modifier = Modifier.heightIn(max = 340.dp)) {
             items(options, key = { it.key }) { option ->
                 val isSelected = option.key == selectedKey
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.sm, vertical = 2.dp)
-                        .clip(RoundedCornerShape(Radius.md))
-                        .background(if (isSelected) AccentSoft else Color.Transparent)
                         .premiumPressableNoScale(onClick = { onSelect(option.key) })
-                        .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                        .padding(horizontal = Spacing.lg, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         option.label,
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (isSelected) TextPrimary else TextSecondary,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         modifier = Modifier.weight(1f)
                     )
                     option.trailing?.let {
                         Text(
                             it,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = TextTertiary,
-                            modifier = Modifier.padding(end = Spacing.xs)
+                            modifier = Modifier.padding(end = Spacing.sm)
                         )
                     }
+                    // A bare check, not a filled disc. One UI marks the chosen row
+                    // with a mark; a coloured badge on it turns a list into a
+                    // column of buttons.
                     if (isSelected) {
-                        Box(
-                            Modifier
-                                .size(20.dp)
-                                .background(AccentPrimary, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        }
+                        Icon(
+                            Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = AccentBright,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
         }
-        Spacer(Modifier.height(Spacing.xs))
     }
 }
 
@@ -223,7 +203,6 @@ fun BoxScope.LevelHud(icon: ImageVector, level: Float, label: String) {
                 shape = RoundedCornerShape(Radius.lg),
                 baseAlpha = 0.60f,
                 fill = GlassFill,
-                stroke = GlassStroke
             )
             .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -271,7 +250,6 @@ fun ScrubPreviewCard(
                 shape = RoundedCornerShape(Radius.md),
                 baseAlpha = 0.72f,
                 fill = GlassFill,
-                stroke = GlassStrokeBright
             )
             .padding(Spacing.xxs),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -378,8 +356,8 @@ fun BoxScope.SeekRippleOverlay(ripple: SeekRipple) {
                     val phase = (t * 3.1f - slot * 0.38f).coerceIn(0f, 1f)
                     val chevronAlpha = if (phase <= 0f) 0f else (1f - (phase - 0.5f).coerceAtLeast(0f) * 1.2f)
                     Icon(
-                        if (ripple.isLeft) Icons.Rounded.ChevronLeft
-                        else Icons.Rounded.ChevronRight,
+                        if (ripple.isLeft) Icons.Outlined.ChevronLeft
+                        else Icons.Outlined.ChevronRight,
                         contentDescription = null,
                         tint = Color.White.copy(alpha = chevronAlpha.coerceIn(0f, 1f) * 0.95f),
                         modifier = Modifier
@@ -409,7 +387,6 @@ fun BoxScope.SpeedBoostBadge(label: String) {
                 shape = CircleShape,
                 baseAlpha = 0.62f,
                 fill = GlassFill,
-                stroke = GlassStrokeBright
             )
             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically
@@ -433,7 +410,6 @@ fun BoxScope.AutoResumeToast(timeLabel: String) {
                 shape = CircleShape,
                 baseAlpha = 0.62f,
                 fill = GlassFill,
-                stroke = GlassStroke
             )
             .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
@@ -453,7 +429,7 @@ fun BoxScope.AutoResumeToast(timeLabel: String) {
 @Composable
 fun PlayerSheetEyebrow(text: String, modifier: Modifier = Modifier) {
     Text(
-        text.uppercase(),
+        text,
         style = SectionEyebrow,
         color = TextTertiary,
         modifier = modifier

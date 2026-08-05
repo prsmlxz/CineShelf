@@ -112,52 +112,37 @@ fun MediaTile(
                 )
             }
 
-            // Lit rim, the same hairline used on library posters.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .glassPanel(
-                        shape = RoundedCornerShape(Radius.lg),
-                        fill = Color.Transparent,
-                        stroke = HairlineMid
-                    )
-            )
+            // No rim, and no play disc. The tile is the play target; a circle
+            // floating over every thumbnail hides the frame and repeats a control
+            // that isn't needed to explain what tapping does.
 
             if (item.effectiveDurationMs > 0) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(6.dp)
-                        .glassPanel(
-                            shape = RoundedCornerShape(Radius.xs),
-                            fill = Color.Black.copy(alpha = 0.55f),
-                            stroke = HairlineLight
-                        )
+                        .clip(RoundedCornerShape(Radius.xs))
+                        .background(Color.Black.copy(alpha = 0.6f))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
                         formatDuration(item.effectiveDurationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.88f),
-                        fontWeight = FontWeight.SemiBold
+                        style = BadgeLabel,
+                        color = Color.White.copy(alpha = 0.88f)
                     )
                 }
             }
 
             if (item.watched) {
-                // Glass and white, not green. A saturated status dot on every
-                // finished tile was the loudest colour on the page, competing
-                // with the accent for attention it doesn't deserve.
+                // White on a dark chip, not green. A saturated status dot on every
+                // finished tile was the loudest colour on the page.
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .size(21.dp)
-                        .glassPanel(
-                            shape = CircleShape,
-                            fill = Color.Black.copy(alpha = 0.55f),
-                            stroke = GlassStrokeBright
-                        ),
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.6f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -185,33 +170,9 @@ fun MediaTile(
                             Modifier
                                 .fillMaxHeight()
                                 .fillMaxWidth(item.progressFraction)
-                                .background(
-                                    Brush.horizontalGradient(listOf(AccentPrimary, AccentGlow)),
-                                    RoundedCornerShape(Radius.pill)
-                                )
+                                .background(AccentPrimary, RoundedCornerShape(Radius.pill))
                         )
                     }
-                }
-            }
-
-            if (!overlayVisible) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(38.dp)
-                        .glassPanel(
-                            shape = CircleShape,
-                            fill = ControlCircleFill,
-                            stroke = ControlCircleStroke
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.PlayArrow,
-                        contentDescription = "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(19.dp)
-                    )
                 }
             }
 
@@ -223,9 +184,9 @@ fun MediaTile(
                 Box(Modifier.fillMaxSize().background(ScrimStrong)) {
                     OverlayIconButton(
                         icon = Icons.Outlined.CheckCircle,
-                        tint = if (item.watched) AccentSuccess else Color.White,
+                        tint = if (item.watched) AccentBright else Color.White,
                         contentDescription = "Toggle watched",
-                        modifier = Modifier.align(Alignment.TopEnd).padding(7.dp),
+                        modifier = Modifier.align(Alignment.TopEnd),
                         onClick = {
                             onToggleWatched()
                             overlayVisible = false
@@ -235,7 +196,7 @@ fun MediaTile(
                         icon = Icons.Outlined.DeleteOutline,
                         tint = AccentDanger,
                         contentDescription = "Delete",
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter),
                         onClick = {
                             onDelete()
                             overlayVisible = false
@@ -280,6 +241,7 @@ private fun subtitleLine(item: VideoItem): String? {
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
+/** Bare glyph on a 48dp target — the overlay scrim already supplies contrast. */
 @Composable
 private fun OverlayIconButton(
     icon: ImageVector,
@@ -290,12 +252,11 @@ private fun OverlayIconButton(
 ) {
     Box(
         modifier = modifier
-            .size(34.dp)
-            .premiumPressable(scaleDown = 0.86f, onClick = onClick)
-            .glassPanel(shape = CircleShape, fill = GlassFillStrong, stroke = GlassStrokeBright),
+            .size(48.dp)
+            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.5f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(17.dp))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(22.dp))
     }
 }
 

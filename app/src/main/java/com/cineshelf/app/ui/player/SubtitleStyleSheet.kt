@@ -22,7 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,6 +53,7 @@ import com.cineshelf.app.ui.theme.ScrimMedium
 import com.cineshelf.app.ui.theme.SectionEyebrow
 import com.cineshelf.app.ui.theme.Spacing
 import com.cineshelf.app.ui.theme.SurfaceCardElevated
+import com.cineshelf.app.ui.theme.SurfaceSheet
 import com.cineshelf.app.ui.theme.SurfaceRaised
 import com.cineshelf.app.ui.theme.TextPrimary
 import com.cineshelf.app.ui.theme.TextSecondary
@@ -211,19 +212,12 @@ const val OFF_TRACK_KEY = "off"
 
 @Composable
 private fun SelectedCheck() {
-    Box(
-        Modifier
-            .size(20.dp)
-            .background(AccentPrimary, CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Rounded.Check,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(13.dp)
-        )
-    }
+    Icon(
+        Icons.Outlined.Check,
+        contentDescription = null,
+        tint = AccentBright,
+        modifier = Modifier.size(20.dp)
+    )
 }
 
 /**
@@ -317,8 +311,9 @@ fun BoxScope.PlaybackSettingsSheet(
 }
 
 /**
- * Shared chrome for the two tall settings sheets: scrim, glass panel, grabber,
- * header, and a scrolling body capped so the sheet never covers the whole video.
+ * Shared chrome for the two tall settings sheets: scrim, opaque surface rounded
+ * at the top only, grabber, header, and a scrolling body capped so the sheet
+ * never covers the whole video.
  */
 @Composable
 private fun BoxScope.SheetScaffold(
@@ -338,15 +333,10 @@ private fun BoxScope.SheetScaffold(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .padding(Spacing.xs)
-            .glassPanelOverVideo(
-                shape = RoundedCornerShape(Radius.xxl),
-                baseAlpha = 0.94f,
-                fill = SurfaceCardElevated.copy(alpha = 0.90f),
-                stroke = GlassStrokeBright
-            )
+            .clip(RoundedCornerShape(topStart = Radius.xxl, topEnd = Radius.xxl))
+            .background(SurfaceSheet)
             .navigationBarsPadding()
-            .padding(vertical = Spacing.sm)
+            .padding(bottom = Spacing.sm)
     ) {
         Box(Modifier.align(Alignment.CenterHorizontally)) { SheetGrabber() }
         SheetHeader(icon = icon, title = title, subtitle = subtitle)
@@ -409,9 +399,13 @@ private fun <T> ValueHeaderSegments(
 }
 
 /**
- * Live sample of the chosen style. The gradient stands in for video so a bright
- * and a dark background are both visible at once — a style that reads well on
- * black often disappears over a bright scene.
+ * Live sample of the chosen style. The ramp stands in for video so a bright and a
+ * dark background are both visible at once — a style that reads well on black
+ * often disappears over a bright scene.
+ *
+ * One continuous dark-to-light sweep rather than the five-stop symmetric ramp it
+ * had before: that version put a hard bright band down the middle of the strip,
+ * which read as a rendering artefact instead of as a stand-in for a scene.
  */
 @Composable
 private fun SubtitlePreviewStrip(prefs: SubtitlePrefs) {
@@ -422,13 +416,13 @@ private fun SubtitlePreviewStrip(prefs: SubtitlePrefs) {
             .clip(RoundedCornerShape(Radius.md))
             .background(
                 Brush.horizontalGradient(
-                    listOf(Color.Black, SurfaceRaised, Color(0xFF6E6E78), SurfaceRaised, Color.Black)
+                    listOf(Color.Black, SurfaceRaised, Color(0xFF7A7A85))
                 )
             ),
         contentAlignment = Alignment.BottomCenter
     ) {
         Text(
-            "PREVIEW",
+            "Preview",
             style = SectionEyebrow,
             color = Color.White.copy(alpha = 0.30f),
             modifier = Modifier

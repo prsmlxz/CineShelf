@@ -33,11 +33,11 @@ import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.KeyboardDoubleArrowLeft
-import androidx.compose.material.icons.rounded.KeyboardDoubleArrowRight
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.outlined.ArrowBackIosNew
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowLeft
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowRight
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -970,7 +971,7 @@ fun PlayerControls(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TransportIconButton(
-                    icon = Icons.Rounded.ArrowBackIosNew,
+                    icon = Icons.Outlined.ArrowBackIosNew,
                     contentDescription = "Back",
                     iconSize = 16.dp,
                     onClick = onBack
@@ -1008,13 +1009,13 @@ fun PlayerControls(
             horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             SkipButton(
-                icon = Icons.Rounded.KeyboardDoubleArrowLeft,
+                icon = Icons.Outlined.KeyboardDoubleArrowLeft,
                 contentDescription = "Back $skipSeconds seconds",
                 onClick = onSkipBack
             )
             PlayPauseButton(isPlaying = isPlaying, onClick = onPlayPause)
             SkipButton(
-                icon = Icons.Rounded.KeyboardDoubleArrowRight,
+                icon = Icons.Outlined.KeyboardDoubleArrowRight,
                 contentDescription = "Forward $skipSeconds seconds",
                 onClick = onSkipForward
             )
@@ -1037,11 +1038,10 @@ fun PlayerControls(
                 fraction = fraction,
                 previewWidth = 176.dp
             ) {
-                val deltaSec = scrubDeltaMs / 1000
                 ScrubPreviewCard(
                     frame = scrubFrame,
                     timeLabel = formatTime(positionMs),
-                    deltaLabel = "${if (deltaSec >= 0) "+" else ""}${deltaSec}s"
+                    deltaLabel = formatSeekDelta(scrubDeltaMs)
                 )
             }
 
@@ -1071,25 +1071,17 @@ fun PlayerControls(
             Spacer(Modifier.height(Spacing.sm))
 
             // Three actions, not eight. Speed, aspect, rotation, sleep timer and
-            // next-episode all moved into the Playback sheet, and subtitle track
-            // selection merged into the Subtitles sheet — they were separate 20dp
-            // targets competing with the two people actually reach for
-            // mid-episode, which are subtitles and audio.
+            // next-episode all live in the Playback sheet, and subtitle track
+            // selection merged into the Subtitles sheet.
             //
-            // All three glyphs come from the Outlined set. The Rounded set mixes
-            // solid and hairline shapes (Subtitles and ClosedCaption render as
-            // filled blocks next to a hairline Tune), which is what made the row
-            // look assembled from different icon packs.
+            // No panel behind them. The bottom scrim already separates this row
+            // from the picture; a bordered pill on top of it was a second
+            // container doing the same job, and it made three plain actions look
+            // like a floating widget.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .glassPanelOverVideo(
-                        shape = RoundedCornerShape(Radius.xl),
-                        baseAlpha = 0.34f,
-                        fill = GlassFill,
-                        stroke = HairlineMid
-                    )
-                    .padding(vertical = Spacing.xs),
+                    .padding(top = Spacing.xxs),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1112,55 +1104,65 @@ fun PlayerControls(
 }
 
 /**
- * The play/pause control. Deliberately the largest thing on screen after the
- * video: a wide translucent disc that brightens while playing, with the glyph
- * sized to fill it rather than floating in the middle of an oversized circle.
+ * The play/pause control.
+ *
+ * No disc. A One UI transport is glyph-only over the picture — a translucent
+ * circle behind the icon is the single clearest tell of a generic player, and
+ * it fights the video for the centre of the frame.
+ *
+ * Emphasis instead comes from three things the skip glyphs don't have: size
+ * (48dp against 30dp), full-opacity white against 72%, and a soft radial
+ * darkening behind it so the glyph stays legible over a blown-out scene. The
+ * darkening has no edge, so it reads as shading rather than as a button.
+ *
+ * Solid glyphs, not outlined. Outlined.Pause is already two solid bars, so the
+ * outlined pair rendered the same control at two different weights depending on
+ * state — and a hollow play triangle reads as a disabled control.
  */
 @Composable
 private fun PlayPauseButton(isPlaying: Boolean, onClick: () -> Unit) {
-    val base by animateFloatAsState(
-        targetValue = if (isPlaying) 0.30f else 0.42f,
-        animationSpec = Motion.standard(),
-        label = "playpause-base"
-    )
     Box(
         modifier = Modifier
-            .size(84.dp)
-            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.72f, onClick = onClick)
-            .glassPanelOverVideo(
-                shape = CircleShape,
-                baseAlpha = base,
-                fill = GlassFillStrong,
-                stroke = GlassStrokeBright,
-                strokeWidth = 1.dp
-            ),
+            .size(76.dp)
+            .premiumPressableSoft(scaleDown = 0.92f, dimTo = 0.6f, onClick = onClick)
+            .drawBehind {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.Black.copy(alpha = 0.34f), Color.Transparent),
+                        center = center,
+                        radius = size.minDimension * 0.55f
+                    ),
+                    radius = size.minDimension * 0.55f
+                )
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription = if (isPlaying) "Pause" else "Play",
             tint = Color.White,
-            modifier = Modifier.size(40.dp)
+            modifier = Modifier.size(48.dp)
         )
     }
 }
 
 /**
- * Skip back/forward. No disc, no label, ~60% of the play button's optical
- * weight — present when you look for it, invisible when you don't.
+ * Skip back/forward. Same glyph-only treatment at ~60% of the play button's
+ * optical weight — present when you look for it, invisible when you don't.
+ * 56dp keeps the target comfortably above the 48dp minimum.
  */
 @Composable
 private fun SkipButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(56.dp)
-            .premiumPressableSoft(scaleDown = 0.86f, dimTo = 0.55f, onClick = onClick),
+            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.5f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = Color.White.copy(alpha = 0.70f),
+            tint = Color.White.copy(alpha = 0.72f),
             modifier = Modifier.size(30.dp)
         )
     }
@@ -1184,8 +1186,9 @@ private fun PillButton(label: String, filled: Boolean = true, onClick: () -> Uni
 }
 
 /**
- * One item on the bottom dock. Four of these means each gets a 24dp glyph and
- * room to breathe, instead of eight 20dp glyphs shoulder to shoulder.
+ * One item on the bottom dock. The 56dp minimum height is what makes the target
+ * comfortable — the visible glyph is only 24dp, but the row it sits in was
+ * previously ~40dp tall, under the Android minimum.
  */
 @Composable
 private fun DockAction(
@@ -1195,45 +1198,46 @@ private fun DockAction(
     onClick: () -> Unit
 ) {
     val tint by animateColorAsState(
-        targetValue = if (active) AccentBright else Color.White.copy(alpha = 0.90f),
+        targetValue = if (active) AccentBright else Color.White.copy(alpha = 0.88f),
         animationSpec = Motion.standard(),
         label = "dock-tint"
     )
     Column(
         modifier = Modifier
-            .premiumPressable(scaleDown = 0.90f, onClick = onClick)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .premiumPressableSoft(scaleDown = 0.94f, dimTo = 0.55f, onClick = onClick)
+            .sizeIn(minWidth = 72.dp, minHeight = 56.dp)
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(Spacing.xxs))
         Text(
             label,
-            style = BadgeLabel,
+            style = MaterialTheme.typography.labelSmall,
             color = if (active) tint else TextSecondary,
             maxLines = 1
         )
     }
 }
 
+/**
+ * Top-bar action. Glyph only, on a 48dp target — the discs these used to sit in
+ * added three competing circles to the top of the frame for no information gain.
+ * The top scrim already provides the contrast that made the discs necessary.
+ */
 @Composable
 private fun TransportIconButton(
     icon: ImageVector,
     contentDescription: String,
-    size: Dp = 40.dp,
-    iconSize: Dp = 19.dp,
+    size: Dp = 48.dp,
+    iconSize: Dp = 21.dp,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .size(size)
-            .premiumPressable(scaleDown = 0.88f, onClick = onClick)
-            .glassPanelOverVideo(
-                shape = CircleShape,
-                baseAlpha = 0.30f,
-                fill = GlassFill,
-                stroke = GlassStroke
-            ),
+            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.55f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -1242,6 +1246,25 @@ private fun TransportIconButton(
             tint = Color.White.copy(alpha = 0.92f),
             modifier = Modifier.size(iconSize)
         )
+    }
+}
+
+/**
+ * The scrub delta, as "+1:35" rather than "+95s".
+ *
+ * Raw seconds were rendered with the badge's letter-spacing applied between the
+ * digits, so a two-figure value read as two separate numbers ("+9 5s"). Clock
+ * form also matches the timestamp directly above it.
+ */
+internal fun formatSeekDelta(deltaMs: Long): String {
+    val sign = if (deltaMs < 0) "-" else "+"
+    val totalSeconds = kotlin.math.abs(deltaMs) / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (minutes > 0) {
+        String.format(Locale.US, "%s%d:%02d", sign, minutes, seconds)
+    } else {
+        "$sign${seconds}s"
     }
 }
 

@@ -73,7 +73,7 @@ import kotlin.math.roundToInt
 // so related controls read as one card.
 // ---------------------------------------------------------------------------
 
-/** A titled group of settings rows on one card, with an all-caps header above. */
+/** A titled group of settings rows on one card, with a quiet header above. */
 @Composable
 fun SettingsGroup(
     title: String,
@@ -83,7 +83,7 @@ fun SettingsGroup(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            title.uppercase(),
+            title,
             style = SectionEyebrow,
             color = TextTertiary,
             modifier = Modifier.padding(start = Spacing.xs, bottom = Spacing.xs)
@@ -129,7 +129,7 @@ fun <T> SegmentedControl(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(38.dp)
+            .height(48.dp)
             .clip(RoundedCornerShape(Radius.sm))
             .background(SurfaceRaised)
             .padding(3.dp)
@@ -239,7 +239,7 @@ fun CineSlider(
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(38.dp)
+            .height(48.dp)
             .pointerInput(steps) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -288,11 +288,7 @@ fun CineSlider(
                 cornerRadius = CornerRadius(1.5f)
             )
             drawRoundRect(
-                brush = Brush.horizontalGradient(
-                    listOf(AccentPrimary, AccentBright),
-                    startX = 0f,
-                    endX = x.coerceAtLeast(1f)
-                ),
+                color = AccentPrimary,
                 topLeft = Offset(0f, cy - 3f),
                 size = Size(x.coerceAtLeast(6f), 6f),
                 cornerRadius = CornerRadius(3f)

@@ -6,172 +6,180 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// The system font is used rather than a bundled typeface — embedding fonts adds
-// real build risk (asset packaging, license files, download providers that need
-// network at first paint) for a marginal gain.
+// One UI typography.
 //
-// Hierarchy comes from contrast, not from colour. Three deliberate gaps:
+// The previous scale used FontWeight.Black at 42sp with -1.6sp tracking — a
+// wordmark treatment applied to interface text. It shouted, and because every
+// heading shouted, none of them ranked.
 //
-//   Weight  — headings jump straight from Normal body text to Bold/Black.
-//             Nothing sits at SemiBold pretending to be both.
-//   Size    — each step is ~1.3x the one below it, so adjacent levels are
-//             unmistakably different rather than "one point smaller".
-//   Tracking— large text tightens (negative), small text opens up (positive).
-//             This is what makes a 28sp title and an 11sp label read as two
-//             different kinds of object rather than the same text resized.
+// This scale is built on three rules taken from One UI:
+//
+//   Weight   — headings top out at Bold. Nothing is Black. Emphasis inside a
+//              heading comes from size, not from adding weight on top of weight.
+//   Tracking — near zero. Slight negative only on the largest sizes, where
+//              default tracking genuinely looks loose. Small text is NOT
+//              letter-spaced open; that is a decorative tic, not hierarchy.
+//   Rhythm   — line heights around 1.35x for headings and 1.45x for body, so
+//              text blocks have air without drifting apart.
+//
+// The result is quieter per element and therefore clearer as a whole.
 private val baseFont = FontFamily.Default
 
-/** Oversized screen header, outside Material's slots. */
+/** The screen title in a One UI large-title header. Big, but not heavy. */
 val LargeTitle = TextStyle(
     fontFamily = baseFont,
-    fontWeight = FontWeight.Black,
-    fontSize = 34.sp,
-    letterSpacing = (-1.1).sp
+    fontWeight = FontWeight.Bold,
+    fontSize = 30.sp,
+    letterSpacing = (-0.5).sp,
+    lineHeight = 38.sp
 )
 
-/** All-caps section eyebrow above content rows. The quietest text in the app. */
+/**
+ * Section eyebrow. Sentence-cased at the call site now rather than shouted in
+ * caps — One UI labels sections, it doesn't stamp them.
+ */
 val SectionEyebrow = TextStyle(
     fontFamily = baseFont,
-    fontWeight = FontWeight.SemiBold,
-    fontSize = 10.sp,
-    letterSpacing = 1.8.sp
+    fontWeight = FontWeight.Medium,
+    fontSize = 12.sp,
+    letterSpacing = 0.sp
 )
 
-/** Small caps-ish metadata badge: resolution, HDR, codec. */
+/** Metadata badge: resolution, codec, channel count. Quiet by construction. */
 val BadgeLabel = TextStyle(
     fontFamily = baseFont,
-    fontWeight = FontWeight.Bold,
-    fontSize = 10.sp,
-    letterSpacing = 0.9.sp
+    fontWeight = FontWeight.Medium,
+    fontSize = 11.sp,
+    letterSpacing = 0.1.sp
 )
 
-/** Tabular-feeling timecode. Medium weight so digits hold their shape small. */
+/** Timecode. Medium weight so digits hold their shape at small sizes. */
 val TimeLabel = TextStyle(
     fontFamily = baseFont,
     fontWeight = FontWeight.Medium,
     fontSize = 12.sp,
-    letterSpacing = 0.4.sp
+    letterSpacing = 0.sp
 )
 
-/** The app wordmark. Flat white — the accent appears as a dot beside it. */
+/** The app wordmark. The one place a heavier weight is justified. */
 val AuroraWordmark = TextStyle(
     fontFamily = baseFont,
-    fontWeight = FontWeight.Black,
+    fontWeight = FontWeight.Bold,
     fontSize = 30.sp,
-    letterSpacing = (-1.2).sp,
+    letterSpacing = (-0.5).sp,
     color = TextPrimary
 )
 
 val CineShelfTypography = Typography(
-    // Display — used once per screen at most.
+    // Display — at most one per screen.
     displayLarge = TextStyle(
         fontFamily = baseFont,
-        fontWeight = FontWeight.Black,
-        fontSize = 42.sp,
-        letterSpacing = (-1.6).sp,
-        lineHeight = 46.sp
+        fontWeight = FontWeight.Bold,
+        fontSize = 34.sp,
+        letterSpacing = (-0.6).sp,
+        lineHeight = 42.sp
     ),
     displayMedium = TextStyle(
         fontFamily = baseFont,
-        fontWeight = FontWeight.Black,
-        fontSize = 33.sp,
-        letterSpacing = (-1.2).sp,
-        lineHeight = 37.sp
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
+        letterSpacing = (-0.5).sp,
+        lineHeight = 38.sp
     ),
     displaySmall = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Bold,
-        fontSize = 26.sp,
-        letterSpacing = (-0.8).sp,
-        lineHeight = 30.sp
+        fontSize = 25.sp,
+        letterSpacing = (-0.3).sp,
+        lineHeight = 32.sp
     ),
 
     // Headline — section and card headers.
     headlineLarge = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Bold,
-        fontSize = 22.sp,
-        letterSpacing = (-0.6).sp,
-        lineHeight = 26.sp
+        fontSize = 21.sp,
+        letterSpacing = (-0.2).sp,
+        lineHeight = 28.sp
     ),
     headlineMedium = TextStyle(
         fontFamily = baseFont,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
-        letterSpacing = (-0.4).sp,
-        lineHeight = 22.sp
+        letterSpacing = (-0.1).sp,
+        lineHeight = 24.sp
     ),
     headlineSmall = TextStyle(
         fontFamily = baseFont,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
-        letterSpacing = (-0.3).sp,
-        lineHeight = 20.sp
+        letterSpacing = 0.sp,
+        lineHeight = 22.sp
     ),
 
     // Title — item names inside cards and rows.
     titleLarge = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 17.sp,
-        letterSpacing = (-0.3).sp,
-        lineHeight = 21.sp
+        fontSize = 16.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 22.sp
     ),
     titleMedium = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
-        letterSpacing = (-0.1).sp,
-        lineHeight = 18.sp
+        fontSize = 15.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 20.sp
     ),
     titleSmall = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        letterSpacing = 0.1.sp,
-        lineHeight = 16.sp
+        fontSize = 13.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 18.sp
     ),
 
-    // Body — prose. Always Normal, always the lightest thing on screen.
+    // Body — prose. Always Normal.
     bodyLarge = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
-        letterSpacing = 0.1.sp,
-        lineHeight = 22.sp
+        fontSize = 16.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 23.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        letterSpacing = 0.15.sp,
-        lineHeight = 19.sp
+        fontSize = 14.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 20.sp
     ),
     bodySmall = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
-        letterSpacing = 0.2.sp,
-        lineHeight = 16.sp
+        fontSize = 12.sp,
+        letterSpacing = 0.sp,
+        lineHeight = 17.sp
     ),
 
-    // Label — buttons and chips. Tighter and heavier than body at the same size.
+    // Label — buttons and chips.
     labelLarge = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        letterSpacing = (-0.1).sp
+        fontSize = 15.sp,
+        letterSpacing = 0.sp
     ),
     labelMedium = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        letterSpacing = 0.2.sp
+        fontSize = 13.sp,
+        letterSpacing = 0.sp
     ),
     labelSmall = TextStyle(
         fontFamily = baseFont,
         fontWeight = FontWeight.Medium,
-        fontSize = 10.sp,
-        letterSpacing = 0.5.sp
+        fontSize = 11.sp,
+        letterSpacing = 0.1.sp
     )
 )

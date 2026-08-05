@@ -90,14 +90,9 @@ fun CineScrubber(
         label = "inactive-height"
     )
     val thumbRadius by animateDpAsState(
-        targetValue = if (isDragging) 11.dp else 6.5.dp,
+        targetValue = if (isDragging) 10.dp else 6.dp,
         animationSpec = Motion.bouncy(),
         label = "thumb-radius"
-    )
-    val glowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0.35f,
-        animationSpec = Motion.standard(),
-        label = "track-glow"
     )
 
     fun fractionFor(x: Float): Float = (x / trackWidthPx).coerceIn(0f, 1f)
@@ -159,44 +154,26 @@ fun CineScrubber(
             }
 
             // Remaining — hairline, running the full width beneath everything.
-            rail(Color.White.copy(alpha = 0.14f), 0f, size.width, inactiveH)
+            rail(Color.White.copy(alpha = 0.24f), 0f, size.width, inactiveH)
 
-            // Buffered ahead — same hairline weight, a shade brighter.
+            // Buffered ahead — same weight, a shade brighter.
             if (bufferedFraction > playedFraction) {
-                rail(Color.White.copy(alpha = 0.24f), 0f, bufferedX, inactiveH)
+                rail(Color.White.copy(alpha = 0.38f), 0f, bufferedX, inactiveH)
             }
 
-            // Elapsed — the heavy rail. A short ramp from deep to bright accent
-            // rather than a multi-hue gradient, so it reads as one colour.
+            // Elapsed — the heavy rail, and one of the three places the accent
+            // is allowed to appear. Flat, not a gradient: a bar that shifts hue
+            // along its length reads as decoration, where a solid one reads as a
+            // measurement.
             if (playedFraction > 0f) {
-                drawRoundRect(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(AccentPrimary, AccentBright),
-                        startX = 0f,
-                        endX = playedX.coerceAtLeast(1f)
-                    ),
-                    topLeft = Offset(0f, centerY - activeH / 2f),
-                    size = Size(playedX.coerceAtLeast(activeH), activeH),
-                    cornerRadius = CornerRadius(activeH / 2f)
-                )
+                rail(AccentPrimary, 0f, playedX, activeH)
             }
 
-            // Glow beneath the thumb — the one place accent light is allowed to
-            // spill past its shape.
+            // Thumb, with a contact shadow so it sits above the rail rather than
+            // being punched out of it. No glow — accent light spilling past its
+            // own shape is the exact effect the design brief rules out.
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(AccentBright.copy(alpha = 0.45f * glowAlpha), Color.Transparent),
-                    center = Offset(playedX, centerY),
-                    radius = thumbR * 3.4f
-                ),
-                radius = thumbR * 3.4f,
-                center = Offset(playedX, centerY)
-            )
-
-            // Thumb, with a soft contact shadow so it sits above the rail rather
-            // than being punched out of it.
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.35f),
+                color = Color.Black.copy(alpha = 0.4f),
                 radius = thumbR + 1.5f,
                 center = Offset(playedX, centerY)
             )

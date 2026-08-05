@@ -9,14 +9,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -91,11 +88,7 @@ fun LibraryContent(
                         .navigationBarsPadding()
                         .padding(horizontal = Spacing.lg)
                 ) {
-                    LibraryTopBar(
-                        showCount = 0,
-                        onRefresh = onRefresh,
-                        onAdd = { showAddDialog = true }
-                    )
+                    LibraryTopBar(onRefresh = onRefresh, onAdd = { showAddDialog = true })
                     EmptyLibrary(onAdd = { showAddDialog = true }, modifier = Modifier.weight(1f))
                 }
             }
@@ -115,11 +108,7 @@ fun LibraryContent(
                         .navigationBarsPadding()
                 ) {
                     item(span = { GridItemSpan(2) }) {
-                        LibraryTopBar(
-                            showCount = state.shows.size,
-                            onRefresh = onRefresh,
-                            onAdd = { showAddDialog = true }
-                        )
+                        LibraryTopBar(onRefresh = onRefresh, onAdd = { showAddDialog = true })
                     }
 
                     if (state.continueWatching.isNotEmpty()) {
@@ -132,7 +121,7 @@ fun LibraryContent(
                     }
 
                     item(span = { GridItemSpan(2) }) {
-                        SectionHeader("My Shelf", "${state.shows.size} collections")
+                        SectionHeader("My Shelf")
                     }
 
                     items(state.shows, key = { it.id }) { show ->
@@ -154,89 +143,62 @@ fun LibraryContent(
     }
 }
 
+/**
+ * One UI large-title header. The title sits on its own line with real space
+ * above it, and the actions align to the baseline rather than floating in
+ * circles beside it — the two glass discs here were the first thing you saw on
+ * opening the app, ahead of the artwork.
+ */
 @Composable
-private fun LibraryTopBar(showCount: Int, onRefresh: () -> Unit, onAdd: () -> Unit) {
+private fun LibraryTopBar(onRefresh: () -> Unit, onAdd: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = Spacing.lg, bottom = Spacing.xs),
+            .padding(top = Spacing.xxl, bottom = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            // The wordmark carries the aurora gradient — the one place the
-            // palette is stated outright rather than implied.
             Text("CineShelf", style = AuroraWordmark)
-            Text(
-                if (showCount == 0) "Your library" else "$showCount in your library",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                modifier = Modifier.padding(top = 2.dp)
-            )
         }
-        CircleGlassButton(Icons.Outlined.Refresh, "Refresh", onClick = onRefresh)
-        Spacer(Modifier.width(Spacing.xs))
-        CircleGlassButton(Icons.Outlined.Add, "Add show", accent = true, onClick = onAdd)
+        BarIconButton(Icons.Outlined.Refresh, "Refresh", onClick = onRefresh)
+        BarIconButton(Icons.Outlined.Add, "Add show", onClick = onAdd)
     }
 }
 
+/**
+ * Section label. No coloured rule beside it, and no second line: the subtitles
+ * that used to sit here ("pick up where you left off", "4 collections") restated
+ * the heading or counted something already on screen, and a caption under every
+ * heading flattens the hierarchy it was meant to create.
+ */
 @Composable
-private fun SectionHeader(title: String, subtitle: String? = null) {
-    Column(modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xxs)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(width = 3.dp, height = 15.dp)
-                    .background(
-                        Brush.verticalGradient(listOf(AccentGlow, AccentPrimary)),
-                        RoundedCornerShape(Radius.pill)
-                    )
-            )
-            Spacer(Modifier.width(Spacing.xs))
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        subtitle?.let {
-            Text(
-                it.uppercase(),
-                style = SectionEyebrow,
-                color = TextQuaternary,
-                modifier = Modifier.padding(start = Spacing.sm, top = 3.dp)
-            )
-        }
-    }
+private fun SectionHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.headlineLarge,
+        color = TextPrimary,
+        modifier = Modifier.padding(top = Spacing.lg, bottom = Spacing.xxs)
+    )
 }
 
+/** A bare 48dp glyph button for the header. */
 @Composable
-private fun CircleGlassButton(
+private fun BarIconButton(
     icon: ImageVector,
     contentDescription: String,
-    accent: Boolean = false,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
-            .size(42.dp)
-            .then(
-                if (accent) Modifier.auroraGlow(AccentPrimary, radius = 12.dp, glowAlpha = 0.40f)
-                else Modifier
-            )
-            .premiumPressable(scaleDown = 0.88f, onClick = onClick)
-            .glassPanel(
-                shape = CircleShape,
-                fill = if (accent) AccentPrimary.copy(alpha = 0.24f) else GlassFill,
-                stroke = if (accent) AccentPrimary.copy(alpha = 0.45f) else GlassStroke
-            ),
+            .size(48.dp)
+            .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.5f, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             icon,
             contentDescription = contentDescription,
-            tint = if (accent) AccentGlow else TextSecondary,
-            modifier = Modifier.size(19.dp)
+            tint = TextPrimary,
+            modifier = Modifier.size(22.dp)
         )
     }
 }
@@ -244,7 +206,7 @@ private fun CircleGlassButton(
 @Composable
 private fun ContinueWatchingSection(entries: List<ContinueWatchingEntry>, onPlay: (File) -> Unit) {
     Column(Modifier.padding(top = Spacing.md)) {
-        SectionHeader("Continue Watching", "pick up where you left off")
+        SectionHeader("Continue Watching")
         Spacer(Modifier.height(Spacing.sm))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -292,24 +254,9 @@ private fun ContinueWatchingCard(entry: ContinueWatchingEntry, onClick: () -> Un
                     )
                 )
         )
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .size(46.dp)
-                .glassPanel(
-                    shape = CircleShape,
-                    fill = ControlCircleFill,
-                    stroke = ControlCircleStroke
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.PlayArrow,
-                contentDescription = "Play",
-                tint = Color.White,
-                modifier = Modifier.size(23.dp)
-            )
-        }
+        // No play disc. The whole card is the play target, and a translucent
+        // circle floating over the artwork is the tell of a generic media grid —
+        // it hides the frame it sits on and repeats on every card.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -337,7 +284,10 @@ private fun ContinueWatchingCard(entry: ContinueWatchingEntry, onClick: () -> Un
     }
 }
 
-/** Thin two-layer progress rail with a glowing filled portion. */
+/**
+ * Progress rail. Flat accent, not a gradient — this is a measurement, and a bar
+ * that changes hue along its length reads as ornament.
+ */
 @Composable
 private fun ProgressRail(fraction: Float) {
     Box(
@@ -351,10 +301,7 @@ private fun ProgressRail(fraction: Float) {
             Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .background(
-                    Brush.horizontalGradient(listOf(AccentPrimary, AccentGlow)),
-                    RoundedCornerShape(Radius.pill)
-                )
+                .background(AccentPrimary, RoundedCornerShape(Radius.pill))
         )
     }
 }
@@ -388,27 +335,16 @@ private fun ShowTile(show: ShowItem, onClick: () -> Unit) {
                     )
             )
 
-            // Hairline inner edge — reads as a lit rim on the poster.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .glassPanel(
-                        shape = RoundedCornerShape(Radius.lg),
-                        fill = Color.Transparent,
-                        stroke = HairlineMid
-                    )
-            )
+            // No rim. Artwork carries its own edge against a black background;
+            // a hairline around every poster turns the shelf into a wireframe.
 
             if (show.seasons.isNotEmpty()) {
                 Box(
                     Modifier
                         .align(Alignment.TopStart)
                         .padding(Spacing.xs)
-                        .glassPanel(
-                            shape = RoundedCornerShape(Radius.xs),
-                            fill = Color.Black.copy(alpha = 0.5f),
-                            stroke = HairlineLight
-                        )
+                        .clip(RoundedCornerShape(Radius.xs))
+                        .background(Color.Black.copy(alpha = 0.55f))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -466,9 +402,6 @@ private fun PosterMonogram(name: String, compact: Boolean = false) {
         // leading edge rather than sitting directly behind it.
         contentAlignment = if (compact) Alignment.CenterStart else Alignment.Center
     ) {
-        // A single faint accent bloom keeps the tile from being pure gray without
-        // tinting the whole card.
-        Box(Modifier.fillMaxSize().auroraGlow(AccentPrimary, radius = 0.dp, glowAlpha = 0.07f))
         Text(
             initial,
             style = MaterialTheme.typography.displayLarge,
@@ -476,14 +409,6 @@ private fun PosterMonogram(name: String, compact: Boolean = false) {
             color = Color.White.copy(alpha = 0.09f),
             modifier = if (compact) Modifier.padding(start = Spacing.md) else Modifier
         )
-        if (!compact) {
-            Icon(
-                Icons.Outlined.Movie,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.13f),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xs).size(16.dp)
-            )
-        }
     }
 }
 
@@ -500,24 +425,18 @@ private fun EmptyLibrary(onAdd: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(Spacing.xxl),
+            .padding(horizontal = Spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(88.dp)
-                .auroraGlow(AccentPrimary, radius = 28.dp, glowAlpha = 0.35f)
-                .glassPanel(shape = CircleShape, fill = GlassFillLight, stroke = GlassStrokeBright),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Outlined.FolderOpen,
-                contentDescription = null,
-                tint = AccentGlow,
-                modifier = Modifier.size(34.dp)
-            )
-        }
+        // A plain oversized glyph, not an icon inside a glowing disc. The disc
+        // added a second shape to look at and said nothing the icon didn't.
+        Icon(
+            Icons.Outlined.FolderOpen,
+            contentDescription = null,
+            tint = TextQuaternary,
+            modifier = Modifier.size(56.dp)
+        )
         Spacer(Modifier.height(Spacing.lg))
         Text(
             "Your shelf is empty",
@@ -534,20 +453,23 @@ private fun EmptyLibrary(onAdd: () -> Unit, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(Spacing.xl))
         Row(
             modifier = Modifier
-                .auroraGlow(AccentPrimary, radius = 18.dp, glowAlpha = 0.28f, cornerRadius = Radius.pill)
                 .premiumPressable(scaleDown = 0.97f, onClick = onAdd)
                 .clip(RoundedCornerShape(Radius.pill))
-                .background(Brush.horizontalGradient(listOf(AccentDeep, AccentPrimary)))
-                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                .background(AccentPrimary)
+                .padding(horizontal = Spacing.xl, vertical = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(Spacing.xxs))
+            Icon(
+                Icons.Outlined.Add,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Spacing.xs))
             Text(
                 "Add Show",
                 color = Color.White,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.labelLarge
             )
         }
     }
@@ -560,18 +482,14 @@ private fun AddShowDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
-                .glassPanel(
-                    shape = RoundedCornerShape(Radius.xl),
-                    fill = SurfaceCardElevated,
-                    stroke = GlassStrokeBright
-                )
+                .clip(RoundedCornerShape(Radius.xl))
+                .background(SurfaceSheet)
                 .padding(Spacing.lg)
         ) {
             Text(
                 "New Show or Movie",
-                style = MaterialTheme.typography.headlineSmall,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineMedium,
+                color = TextPrimary
             )
             Spacer(Modifier.height(Spacing.xxs))
             Text(

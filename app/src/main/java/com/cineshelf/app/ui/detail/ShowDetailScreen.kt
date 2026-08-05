@@ -12,7 +12,7 @@ import androidx.compose.material.icons.outlined.ArrowBackIosNew
 import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Videocam
@@ -82,14 +82,11 @@ fun ShowDetailScreen(
                     modifier = Modifier
                         .padding(Spacing.md)
                         .navigationBarsPadding()
-                        .glassPanel(
-                            shape = RoundedCornerShape(Radius.lg),
-                            fill = SurfaceCardElevated,
-                            stroke = GlassStrokeBright
-                        ),
+                        .clip(RoundedCornerShape(Radius.lg))
+                        .background(SurfaceSheet),
                     containerColor = Color.Transparent,
                     contentColor = TextPrimary,
-                    actionColor = AccentGlow,
+                    actionColor = AccentBright,
                     snackbarData = data
                 )
             }
@@ -191,7 +188,7 @@ fun ShowContent(
             item {
                 MediaRail(
                     title = if (visibleSeasons.isEmpty()) "Videos" else "Movies & Specials",
-                    count = visibleStandalone.size,
+                    countLabel = visibleStandalone.size.let { if (it == 1) "1 video" else "$it videos" },
                     items = visibleStandalone,
                     onPlay = onPlay,
                     onToggleWatched = onToggleWatched,
@@ -280,21 +277,23 @@ private fun DetailHero(
 
         Column(Modifier.fillMaxWidth().statusBarsPadding()) {
             Row(
-                Modifier.padding(start = Spacing.md, top = Spacing.xs),
+                Modifier.padding(start = Spacing.xs, top = Spacing.xxs),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Bare glyph on a 48dp target. The glass disc it used to sit in
+                // was the only circle on the page and drew the eye away from the
+                // artwork it was floating on.
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .premiumPressable(scaleDown = 0.88f, onClick = onBack)
-                        .glassPanel(shape = CircleShape, fill = GlassFill, stroke = GlassStroke),
+                        .size(48.dp)
+                        .premiumPressableSoft(scaleDown = 0.90f, dimTo = 0.5f, onClick = onBack),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Outlined.ArrowBackIosNew,
                         contentDescription = "Back",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(15.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -306,7 +305,7 @@ private fun DetailHero(
                 verticalAlignment = Alignment.Bottom
             ) {
                 PosterCard(artwork = artwork, name = show.name)
-                Spacer(Modifier.width(Spacing.sm))
+                Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f).padding(bottom = Spacing.xxs)) {
                     Text(
                         show.name,
@@ -317,9 +316,9 @@ private fun DetailHero(
                     )
                     Spacer(Modifier.height(Spacing.xxs))
                     Text(
-                        libraryLine(show).uppercase(),
-                        style = SectionEyebrow,
-                        color = TextTertiary
+                        libraryLine(show),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
             }
@@ -340,12 +339,22 @@ private fun DetailHero(
     }
 }
 
-/** 2:3 poster with a lit rim, sitting on the backdrop's lower fade. */
+/**
+ * The single section-heading treatment for this page, matching the library's.
+ * Title case, one size — "Continue watching" here against "Continue Watching"
+ * two taps away read as two different apps.
+ */
+@Composable
+private fun SectionHeading(text: String) {
+    Text(text, style = MaterialTheme.typography.headlineLarge, color = TextPrimary)
+}
+
+/** 2:3 poster sitting on the backdrop's lower fade. */
 @Composable
 private fun PosterCard(artwork: String?, name: String) {
     Box(
         Modifier
-            .width(104.dp)
+            .width(108.dp)
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(Radius.md))
             .background(SurfaceCard),
@@ -376,21 +385,12 @@ private fun PosterCard(artwork: String?, name: String) {
                 )
             }
         }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .glassPanel(
-                    shape = RoundedCornerShape(Radius.md),
-                    fill = Color.Transparent,
-                    stroke = HairlineStrong
-                )
-        )
     }
 }
 
 /**
- * The one solid-accent element on the page. Everything else is glass or
- * outline, so this is unambiguously the primary action — and it says what it
+ * The one solid-accent element on the page. Everything else is text or plain
+ * surface, so this is unambiguously the primary action — and it says what it
  * will actually do rather than just "Play".
  */
 @Composable
@@ -399,25 +399,23 @@ private fun PlayButton(item: VideoItem, onPlay: () -> Unit, modifier: Modifier =
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .auroraGlow(AccentPrimary, radius = 18.dp, glowAlpha = 0.28f, cornerRadius = Radius.pill)
             .premiumPressable(scaleDown = 0.97f, onClick = onPlay)
             .clip(RoundedCornerShape(Radius.pill))
-            .background(Brush.horizontalGradient(listOf(AccentDeep, AccentPrimary)))
-            .padding(vertical = Spacing.sm),
+            .background(AccentPrimary)
+            .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            Icons.Outlined.PlayArrow,
+            Icons.Filled.PlayArrow,
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(20.dp)
         )
-        Spacer(Modifier.width(Spacing.xxs))
+        Spacer(Modifier.width(Spacing.xs))
         Text(
             if (resuming) "Resume from ${formatClock(item.positionMs)}" else "Play",
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
             color = Color.White
         )
     }
@@ -435,13 +433,13 @@ private fun SpecSheet(item: VideoItem, info: MediaInfo) {
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.md)
     ) {
-        Text("DETAILS", style = SectionEyebrow, color = TextTertiary)
+        SectionHeading("Details")
         Spacer(Modifier.height(Spacing.xs))
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.lg))
-                .background(SurfaceCard.copy(alpha = 0.72f))
+                .background(SurfaceCard)
                 .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
         ) {
             runtimeOf(item)?.let { SpecLine(Icons.Outlined.Schedule, "Runtime", it) }
@@ -498,20 +496,19 @@ private fun ProgressPanel(item: VideoItem, episodeLabel: String?) {
             .fillMaxWidth()
             .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
     ) {
-        Text("CONTINUE WATCHING", style = SectionEyebrow, color = TextTertiary)
+        SectionHeading("Continue Watching")
         Spacer(Modifier.height(Spacing.xs))
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.lg))
-                .background(SurfaceCard.copy(alpha = 0.72f))
+                .background(SurfaceCard)
                 .padding(Spacing.sm)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     episodeLabel ?: "$percent% watched",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
                     color = TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -536,10 +533,7 @@ private fun ProgressPanel(item: VideoItem, episodeLabel: String?) {
                     Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(item.progressFraction)
-                        .background(
-                            Brush.horizontalGradient(listOf(AccentDeep, AccentGlow)),
-                            RoundedCornerShape(Radius.pill)
-                        )
+                        .background(AccentPrimary, RoundedCornerShape(Radius.pill))
                 )
             }
         }
@@ -585,7 +579,7 @@ private fun SeasonRail(
 ) {
     MediaRail(
         title = season.title,
-        count = season.episodes.size,
+        countLabel = season.episodes.size.let { if (it == 1) "1 episode" else "$it episodes" },
         items = season.episodes,
         onPlay = onPlay,
         onToggleWatched = onToggleWatched,
@@ -596,40 +590,26 @@ private fun SeasonRail(
 @Composable
 private fun MediaRail(
     title: String,
-    count: Int,
+    countLabel: String,
     items: List<VideoItem>,
     onPlay: (VideoItem) -> Unit,
     onToggleWatched: (VideoItem) -> Unit,
     onDelete: (VideoItem) -> Unit
 ) {
-    Column(Modifier.padding(top = Spacing.xs)) {
+    Column(Modifier.padding(top = Spacing.md)) {
         Row(
             modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Bottom
         ) {
-            Box(
-                Modifier
-                    .size(width = 3.dp, height = 15.dp)
-                    .background(
-                        Brush.verticalGradient(listOf(AccentGlow, AccentPrimary)),
-                        RoundedCornerShape(Radius.pill)
-                    )
-            )
+            SectionHeading(title)
             Spacer(Modifier.width(Spacing.xs))
+            // Named, not a bare numeral. "Season 1  5" made the reader guess
+            // what was being counted.
             Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Spacer(Modifier.width(Spacing.xs))
-            Text(
-                "$count",
-                style = MaterialTheme.typography.labelSmall,
+                countLabel,
+                style = MaterialTheme.typography.bodyMedium,
                 color = TextTertiary,
-                modifier = Modifier
-                    .glassPanel(shape = RoundedCornerShape(Radius.pill), fill = GlassFill)
-                    .padding(horizontal = 7.dp, vertical = 1.dp)
+                modifier = Modifier.padding(bottom = 2.dp)
             )
         }
         LazyRow(

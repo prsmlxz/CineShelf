@@ -22,12 +22,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.cineshelf.app.data.MediaInfo
-import com.cineshelf.app.ui.theme.AccentBright
-import com.cineshelf.app.ui.theme.AccentPrimary
 import com.cineshelf.app.ui.theme.BadgeLabel
 import com.cineshelf.app.ui.theme.HairlineMid
 import com.cineshelf.app.ui.theme.Radius
 import com.cineshelf.app.ui.theme.Spacing
+import com.cineshelf.app.ui.theme.TextPrimary
 import com.cineshelf.app.ui.theme.TextSecondary
 import com.cineshelf.app.ui.theme.TextTertiary
 
@@ -49,25 +48,27 @@ fun MetaBadge(text: String, modifier: Modifier = Modifier) {
             .background(Color.White.copy(alpha = 0.055f))
             .padding(horizontal = Spacing.xs, vertical = 5.dp)
     ) {
-        Text(text.uppercase(), style = BadgeLabel, color = TextSecondary)
+        Text(text, style = BadgeLabel, color = TextSecondary)
     }
 }
 
 /**
- * Accented badge, reserved for HDR and Dolby.
+ * Emphasised badge, reserved for HDR and Dolby.
  *
- * A tinted fill with a matching border rather than solid purple — solid would
- * pull more attention than the play button beside it.
+ * Monochrome, like everything else in the row — it separates itself by
+ * luminance, not by hue. Accent colour is reserved for selection, progress and
+ * the primary action; spending it on a capability label makes "HDR" compete
+ * with the Play button directly beneath it.
  */
 @Composable
 fun FeatureBadge(text: String, modifier: Modifier = Modifier) {
     Box(
         modifier
             .clip(RoundedCornerShape(Radius.xs))
-            .background(AccentPrimary.copy(alpha = 0.18f))
+            .background(Color.White.copy(alpha = 0.14f))
             .padding(horizontal = Spacing.xs, vertical = 5.dp)
     ) {
-        Text(text.uppercase(), style = BadgeLabel, color = AccentBright)
+        Text(text, style = BadgeLabel, color = TextPrimary)
     }
 }
 
